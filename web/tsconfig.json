@@ -19,6 +19,17 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+
+  // Um tsconfig só, sem project references.
+  //
+  // O arranjo padrão do Vite separa vite.config.ts num tsconfig.node.json
+  // referenciado. Isso custa um erro conhecido — TS6310, "referenced
+  // project may not disable emit" — porque projeto referenciado precisa
+  // poder emitir, e um tsconfig de checagem quer justamente o contrário.
+  //
+  // A separação existiria para dar ao arquivo de config o ambiente do Node
+  // em vez do DOM. Este vite.config.ts não usa nenhuma API do Node: só
+  // importa de 'vite' e dos plugins, que trazem os próprios tipos. Sem essa
+  // necessidade, a indireção era só um arquivo a mais para quebrar.
+  "include": ["src", "vite.config.ts"]
 }
