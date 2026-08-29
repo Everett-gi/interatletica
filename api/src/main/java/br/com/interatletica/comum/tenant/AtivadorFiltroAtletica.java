@@ -5,6 +5,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.hibernate.Session;
+import br.com.interatletica.comum.OrdemDosAspectos;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -18,12 +19,14 @@ import java.util.UUID;
  * porque o filtro do Hibernate vive na {@code Session} — que só existe
  * depois que a transação abre.</p>
  *
- * <p>A ordem 100 coloca este aspecto DENTRO do proxy transacional do
- * Spring: a transação abre primeiro, o filtro é ligado em seguida.</p>
+ * <p>A ordem precisa ser MAIOR que a do proxy transacional para que este
+ * aspecto rode DENTRO dele: a transação abre primeiro, e só então o filtro
+ * é ligado na Session que ela criou. No Spring AOP, menor ordem roda por
+ * fora — ver {@link OrdemDosAspectos}, e o teste que trava a invariante.</p>
  */
 @Aspect
 @Component
-@Order(100)
+@Order(OrdemDosAspectos.FILTRO_DE_ATLETICA)
 public class AtivadorFiltroAtletica {
 
     private final EntityManager entityManager;

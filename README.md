@@ -109,6 +109,12 @@ public class Evento extends EntidadeDeAtletica { ... }
 
 Esquecer isso não gera erro de compilação nem exceção em runtime — a consulta simplesmente devolve dados de todas as atléticas. Por isso `IsolamentoDeAtleticaTest` varre o classpath e **quebra o build** se alguma entidade herdar de `EntidadeDeAtletica` sem o filtro. Não confie em revisão de PR para pegar isso.
 
+**O segundo ponto frágil, e ele já mordeu:** a ordem do aspecto. No Spring AOP, quem tem o menor valor de `order` roda por FORA. O `AtivadorFiltroAtletica` nasceu com `@Order(100)` enquanto o proxy transacional fica em `Integer.MAX_VALUE` por padrão — ou seja, o aspecto rodava por fora da transação. Ele chamava `unwrap(Session.class)` sem transação ativa, o Spring criava uma sessão temporária, o filtro era ligado nela, e ela era descartada. A transação abria em seguida com sessão limpa, **sem filtro**.
+
+O resultado era o pior caso possível: nenhum erro, nenhuma exceção, e o isolamento simplesmente não valendo. O teste arquitetural não via — ele confere se a anotação existe, não se ela chega a valer.
+
+Hoje as ordens são explícitas em `OrdemDosAspectos`, e `OrdemDoFiltroDeAtleticaTest` trava a invariante: mexer nos números sem entender o efeito quebra o build em vez de vazar dado. A cadeia correta, de fora para dentro, é `@PreAuthorize` → transação → filtro de atlética → método.
+
 ---
 
 ## Permissão
