@@ -84,6 +84,14 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Extensao @Testcontainers/@Container do JUnit 5. Nao vem junto
+             com o modulo postgresql: aquele traz o container, este traz o
+             ciclo de vida dele dentro do teste. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>

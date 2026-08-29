@@ -199,7 +199,9 @@ O Vite faz proxy de `/api`, `/oauth2` e `/login` para `:8080`. Isso não é conv
 cd api && mvn test
 ```
 
-Quatro coisas são verificadas, e vale saber o que cada uma pega:
+82 testes. Os que exigem Docker se **pulam sozinhos** quando ele não existe, em vez de derrubar o build — um build que falha por falta de Docker ensina a rodar `-DskipTests`, que é como se perde uma suíte inteira. No CI o Docker existe e eles rodam de verdade.
+
+O que cada grupo pega:
 
 **`IsolamentoDeAtleticaTest`** — varre o classpath e quebra o build se alguma entidade herdar de `EntidadeDeAtletica` sem declarar `@Filter`. Verifica também o caminho de fuga: entidade que declara `atletica_id` por conta própria, sem herdar a superclasse, precisa estar numa lista de exceções **com justificativa escrita** — hoje só `Inscricao` e `EventoOrganizador`, pelos motivos da seção de modelo de dados. E confere que a varredura não voltou vazia: um teste de isolamento que não encontra entidade nenhuma passa sem verificar nada.
 
@@ -207,9 +209,15 @@ Quatro coisas são verificadas, e vale saber o que cada uma pega:
 
 **`SlugsTest`** — o contrato protegido não é estético, é o `CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')`. Slug fora do formato não vira erro de validação: vira violação de constraint, ou seja, 500 na cara de quem só quis criar um evento.
 
-**`EventoTest`** — o ciclo de vida do evento, sem Spring e sem banco. As regras moram na entidade justamente para valerem por qualquer caminho de chamada.
+**`SchemaCompativelTest`** *(exige Docker)* — sobe a aplicação contra um Postgres real e responde a pergunta mais perigosa do projeto: as entidades JPA batem com o schema? Com `ddl-auto: validate`, divergência não é aviso — a aplicação não sobe, e como o Hibernate nunca altera tabela, isso só apareceria no primeiro startup do ambiente que tem banco. Verifica também que a migration criou as 16 tabelas, que `uk_inscricao_usuario` continua **parcial** (é ele que permite reinscrever depois de cancelar) e que a auditoria grava JSONB e INET pelos casts do SQL.
 
-O que **não** é coberto: se as entidades batem com o schema real. Isso é papel do `ddl-auto: validate` contra Postgres de verdade, com Testcontainers — que exige Docker.
+**`EventoTest`, `InscricaoTest`, `ConviteTest`** — ciclo de vida das entidades, sem Spring e sem banco. As regras moram nas entidades justamente para valerem por qualquer caminho de chamada. Vários testes aqui protegem CHECKs do banco: `posicao_espera` que anda junto com o status, token de check-in no formato exato do `DEFAULT` da coluna, convite de uso único.
+
+**`PapelTest`** — a hierarquia usa `ordinal()`, então reordenar as constantes do enum inverteria a permissão sem erro de compilação. O teste transforma isso em build vermelho.
+
+**`ListaDeParticipantesCsvTest`** e **`PropriedadesDaAplicacaoTest`** — o CSV que abre no Excel pt-BR (BOM, ponto e vírgula, fuso de São Paulo, aspas escapadas) e a lista de operadores tolerando caixa e espaço no `.env`, que é o que evita trancar do lado de fora quem deveria criar a primeira atlética.
+
+Ainda não coberto: o isolamento entre atléticas exercitado ponta a ponta contra o banco. O teste arquitetural garante que o filtro está *declarado* em toda entidade; falta um que prove que ele *filtra*.
 
 ---
 

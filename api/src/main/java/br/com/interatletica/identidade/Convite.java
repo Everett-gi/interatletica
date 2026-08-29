@@ -141,6 +141,11 @@ public class Convite extends EntidadeDeAtletica {
         return aceitoEm;
     }
 
+    /** Quem aceitou. O convite é endereçado, mas quem entra é auditado. */
+    public UUID getAceitoPor() {
+        return aceitoPor;
+    }
+
     public OffsetDateTime getRevogadoEm() {
         return revogadoEm;
     }
