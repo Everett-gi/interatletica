@@ -1,0 +1,88 @@
+# =====================================================================
+# Interatlética — Caddy
+#
+# Domínio único para API e PWA. Isso não é preguiça: mantém o cookie de
+# sessão same-site, elimina preflight de CORS e reduz a superfície de
+# configuração. Separar em api.dominio depois é uma linha de mudança.
+# =====================================================================
+
+{
+	email {$EMAIL_ACME}
+	servers {
+		# Necessário para que o Spring monte as URLs de redirect do OAuth
+		# com https e o host público, e não com http://api:8080.
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DOMINIO}, www.{$DOMINIO} {
+
+	encode zstd gzip
+
+	# -----------------------------------------------------------------
+	# Cabeçalhos de segurança
+	# -----------------------------------------------------------------
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		Permissions-Policy        "geolocation=(), microphone=(), camera=(self)"
+		Cross-Origin-Opener-Policy "same-origin"
+
+		# camera=(self) é intencional: o check-in por QR code lê a câmera
+		# na portaria do evento.
+
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com"
+
+		-Server
+		-X-Powered-By
+	}
+
+	# -----------------------------------------------------------------
+	# API
+	# -----------------------------------------------------------------
+	handle /api/* {
+		reverse_proxy api:8080 {
+			header_up X-Real-IP {remote_host}
+			health_uri /actuator/health/readiness
+			health_interval 30s
+		}
+	}
+
+	# Fluxo OAuth do Spring Security vive fora de /api.
+	handle /oauth2/* {
+		reverse_proxy api:8080
+	}
+	handle /login/oauth2/* {
+		reverse_proxy api:8080
+	}
+
+	# Actuator nunca é exposto publicamente.
+	handle /actuator/* {
+		respond 404
+	}
+
+	# -----------------------------------------------------------------
+	# PWA
+	# -----------------------------------------------------------------
+	handle {
+		reverse_proxy web:80
+	}
+
+	# O service worker precisa ser revalidado sempre, senão o usuário
+	# fica preso numa versão antiga do app por dias.
+	@service_worker path /sw.js /manifest.webmanifest
+	header @service_worker Cache-Control "no-cache, must-revalidate"
+
+	@estaticos path /assets/*
+	header @estaticos Cache-Control "public, max-age=31536000, immutable"
+
+	log {
+		output file /data/acesso.log {
+			roll_size 20mb
+			roll_keep 7
+		}
+		format json
+	}
+}

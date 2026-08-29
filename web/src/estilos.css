@@ -1,0 +1,411 @@
+/* =====================================================================
+   Interatlética — folha de estilo única.
+
+   Sem framework de CSS. O app tem uma dúzia de telas e um vocabulário
+   visual pequeno; uma dependência de 40 kB para isso é peso morto no
+   3G do ginásio, que é onde a página do evento mais abre.
+   ===================================================================== */
+
+:root {
+  --fundo: #0b1220;
+  --fundo-elevado: #131c2e;
+  --fundo-cartao: #172136;
+  --borda: #24304a;
+  --texto: #eef2f8;
+  --texto-suave: #9fb0cc;
+  --texto-fraco: #6d7f9e;
+
+  --acento: #3d7bfd;
+  --acento-escuro: #2b5fd0;
+  --sucesso: #2fb87a;
+  --alerta: #e0a32e;
+  --perigo: #e5484d;
+
+  --raio: 12px;
+  --raio-pequeno: 8px;
+  --sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.2);
+
+  --largura-maxima: 62rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+h3 {
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--acento);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------------ */
+/* Estrutura                                                          */
+/* ------------------------------------------------------------------ */
+
+.aplicacao {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.conteudo {
+  flex: 1;
+  width: 100%;
+  max-width: var(--largura-maxima);
+  margin: 0 auto;
+  /* env(safe-area-*) protege o conteúdo do notch quando instalada como
+     PWA em tela cheia no iPhone. */
+  padding: 1.25rem max(1rem, env(safe-area-inset-left)) 3rem
+    max(1rem, env(safe-area-inset-right));
+}
+
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgb(11 18 32 / 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--borda);
+}
+
+.cabecalho__interno {
+  max-width: var(--largura-maxima);
+  margin: 0 auto;
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.marca {
+  font-weight: 700;
+  color: var(--texto);
+  letter-spacing: -0.02em;
+}
+.marca:hover {
+  text-decoration: none;
+}
+
+.cabecalho__espaco {
+  flex: 1;
+}
+
+.rodape {
+  border-top: 1px solid var(--borda);
+  color: var(--texto-fraco);
+  font-size: 0.85rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cartões e listas                                                   */
+/* ------------------------------------------------------------------ */
+
+.cartao {
+  background: var(--fundo-cartao);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 1rem;
+}
+
+.grade {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+}
+
+.pilha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.entre {
+  justify-content: space-between;
+}
+
+/* ------------------------------------------------------------------ */
+/* Controles                                                          */
+/* ------------------------------------------------------------------ */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  /* 44px é o alvo mínimo de toque confortável; a portaria usa isto de
+     pé, com uma mão, segurando o celular. */
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: var(--acento);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.botao:hover:not(:disabled) {
+  background: var(--acento-escuro);
+}
+.botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.botao--discreto {
+  background: transparent;
+  border-color: var(--borda);
+  color: var(--texto);
+}
+.botao--discreto:hover:not(:disabled) {
+  background: var(--fundo-elevado);
+}
+
+.botao--perigo {
+  background: transparent;
+  border-color: var(--perigo);
+  color: var(--perigo);
+}
+.botao--perigo:hover:not(:disabled) {
+  background: rgb(229 72 77 / 0.12);
+}
+
+.botao--largo {
+  width: 100%;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+
+.campo__rotulo {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.campo__dica {
+  font-size: 0.8rem;
+  color: var(--texto-fraco);
+}
+
+.campo__erro {
+  font-size: 0.8rem;
+  color: var(--perigo);
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  background: var(--fundo-elevado);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  color: var(--texto);
+  font: inherit;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.botao:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sinalização                                                        */
+/* ------------------------------------------------------------------ */
+
+.etiqueta {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid var(--borda);
+  color: var(--texto-suave);
+}
+
+.etiqueta--publicado {
+  border-color: rgb(47 184 122 / 0.4);
+  background: rgb(47 184 122 / 0.12);
+  color: var(--sucesso);
+}
+.etiqueta--rascunho {
+  border-color: rgb(224 163 46 / 0.4);
+  background: rgb(224 163 46 / 0.12);
+  color: var(--alerta);
+}
+.etiqueta--cancelado {
+  border-color: rgb(229 72 77 / 0.4);
+  background: rgb(229 72 77 / 0.12);
+  color: var(--perigo);
+}
+
+.aviso {
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--acento);
+  background: var(--fundo-elevado);
+  border-radius: var(--raio-pequeno);
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.aviso--erro {
+  border-left-color: var(--perigo);
+  color: #ffd7d8;
+}
+
+.aviso--sucesso {
+  border-left-color: var(--sucesso);
+}
+
+.suave {
+  color: var(--texto-suave);
+}
+.fraco {
+  color: var(--texto-fraco);
+  font-size: 0.87rem;
+}
+
+.vazio {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--texto-fraco);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabela de participantes                                            */
+/* ------------------------------------------------------------------ */
+
+.rolagem-horizontal {
+  overflow-x: auto;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--borda);
+}
+
+th {
+  background: var(--fundo-elevado);
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Carregando                                                         */
+/* ------------------------------------------------------------------ */
+
+.girando {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2px solid var(--borda);
+  border-top-color: var(--acento);
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+  margin: 2.5rem auto;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respeita quem pediu menos animação no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation-duration: 2s;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,113 @@
+name: interatletica
+
+# ---------------------------------------------------------------------
+# Topologia
+#
+#   internet → caddy (443) ─┬─ /api/*  → api:8080
+#                           └─ /*      → web:80   (PWA estático)
+#                                api   → db:5432  (rede interna)
+#
+# Só o Caddy publica porta no host. O banco NUNCA é exposto — para
+# acessá-lo, use o docker-compose.override.yml de desenvolvimento ou
+# um túnel SSH.
+# ---------------------------------------------------------------------
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: interatletica-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-interatletica}
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      # Evita reindexação por mudança de locale entre versões da imagem.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      TZ: America/Sao_Paulo
+    volumes:
+      - db_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-interatletica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interna]
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: interatletica-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-interatletica}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?defina GOOGLE_CLIENT_ID no .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?defina GOOGLE_CLIENT_SECRET no .env}
+      APP_URL_BASE: ${APP_URL_BASE:-https://interatletica.com.br}
+      APP_OPERADORES: ${APP_OPERADORES:-}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -Duser.timezone=America/Sao_Paulo"
+      TZ: America/Sao_Paulo
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks: [interna, borda]
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: interatletica-web
+    restart: unless-stopped
+    networks: [borda]
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: interatletica-caddy
+    restart: unless-stopped
+    depends_on: [api, web]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"          # HTTP/3
+    environment:
+      DOMINIO: ${DOMINIO:-interatletica.com.br}
+      EMAIL_ACME: ${EMAIL_ACME:?defina EMAIL_ACME no .env}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data
+      - caddy_config:/config
+    networks: [borda]
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # `interna` não tem saída para a internet: só api ↔ db.
+  interna:
+    driver: bridge
+    internal: true
+  borda:
+    driver: bridge
+
+volumes:
+  db_dados:
+  caddy_dados:
+  caddy_config:
