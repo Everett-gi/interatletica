@@ -56,6 +56,34 @@ jobs:
         # schema real acontece.
         run: mvn -B --no-transfer-progress verify
 
+      - name: Exigir que o teste de schema tenha rodado de verdade
+        working-directory: api
+        # SchemaCompativelTest se pula sozinho quando não há Docker. Isso é
+        # correto na máquina de desenvolvimento e seria desastroso aqui: o
+        # teste mais importante do projeto ficaria verde sem executar, e a
+        # divergência entre entidade e schema voltaria a só aparecer no
+        # primeiro startup com banco de verdade.
+        #
+        # Este passo transforma "pulou" em falha — mas só no CI, que é o
+        # único lugar onde Docker é obrigatório.
+        run: |
+          relatorio=target/surefire-reports/TEST-br.com.interatletica.SchemaCompativelTest.xml
+          if [ ! -f "$relatorio" ]; then
+            echo "::error::O teste de schema não gerou relatório — não foi executado."
+            exit 1
+          fi
+          pulados=$(sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' "$relatorio" | head -1)
+          total=$(sed -n 's/.*[^a-z]tests="\([0-9]*\)".*/\1/p' "$relatorio" | head -1)
+          echo "Testes de schema: $total executados, $pulados pulados."
+          if [ "$total" = "0" ] || [ -z "$total" ]; then
+            echo "::error::Nenhum teste de schema foi executado."
+            exit 1
+          fi
+          if [ "$pulados" != "0" ]; then
+            echo "::error::$pulados teste(s) de schema pulados. Docker indisponível no runner?"
+            exit 1
+          fi
+
       - name: Guardar relatórios quando falhar
         if: failure()
         uses: actions/upload-artifact@v5
