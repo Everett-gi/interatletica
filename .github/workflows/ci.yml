@@ -1,0 +1,108 @@
+# =====================================================================
+# Integração contínua.
+#
+# Existe por um motivo concreto: a máquina de desenvolvimento do projeto
+# não tem Node nem Docker. Sem isso, duas coisas nunca são verificadas
+# antes de chegar aqui — o front não é compilado, e os testes contra
+# Postgres real não rodam. O runner do GitHub tem os dois.
+#
+# Os dois jobs são independentes de propósito: quebrar o TypeScript não
+# deve esconder o resultado dos testes da API, nem o contrário.
+# =====================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Push seguido de push na mesma branch cancela a execução anterior: o
+# resultado dela já não interessa, e a fila de runners é compartilhada.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# CI só lê o repositório. Declarar explicitamente porque o padrão da conta
+# pode ser leitura E escrita — e uma ação de terceiro comprometida, com um
+# token de escrita em mãos, escreve na branch.
+permissions:
+  contents: read
+
+jobs:
+
+  api:
+    name: API · Java 21
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Compilar e testar
+        working-directory: api
+        # verify, e não test: roda também o empacotamento, que é onde um
+        # erro de configuração do spring-boot-maven-plugin apareceria.
+        # O runner tem Docker, então os testes com Testcontainers, quando
+        # existirem, rodam aqui — é o único lugar onde rodam hoje.
+        run: mvn -B --no-transfer-progress verify
+
+      - name: Guardar relatórios quando falhar
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-surefire
+          path: api/target/surefire-reports/
+          retention-days: 7
+
+  web:
+    name: PWA · TypeScript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # Sem `cache: npm` de propósito: o cache do setup-node exige um
+          # lockfile e falha o job inteiro quando não encontra um. Assim
+          # que package-lock.json for commitado, acrescente
+          # `cache: npm` aqui e troque o passo abaixo por `npm ci`.
+      - name: Instalar dependências
+        working-directory: web
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Verificar tipos
+        working-directory: web
+        # Separado do build para que a mensagem de falha diga "os tipos
+        # não batem" em vez de "o build quebrou".
+        run: npm run checar
+
+      - name: Construir
+        working-directory: web
+        run: npm run build
+
+      - name: Guardar o lockfile gerado
+        # Enquanto não houver package-lock.json no repositório, cada
+        # execução resolve as versões de novo e o build não é
+        # reproduzível. Este artefato é o lockfile pronto para commitar.
+        if: hashFiles('web/package-lock.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: web/package-lock.json
+          retention-days: 7
