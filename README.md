@@ -52,9 +52,12 @@ interatletica/
 │   ├── vite.config.ts          PWA, service worker, proxy de dev
 │   └── src/
 │       ├── api/                cliente HTTP, tipos, mapa de rotas
+│       ├── dados/              a fachada: API real ou demonstração
+│       ├── demo/               dados fictícios e loja em memória
+│       ├── ui/                 design system, tema por atlética
 │       ├── sessao/             quem está logado e com que papel
-│       ├── componentes/        peças repetidas e o hook de busca
-│       └── paginas/            uma por tela
+│       └── paginas/            públicas na raiz, hub/ para a diretoria
+├── vercel.json                 deploy do front em modo demonstração
 └── infra/
     ├── Caddyfile               TLS automático + headers de segurança
     └── scripts/
@@ -114,6 +117,38 @@ Esquecer isso não gera erro de compilação nem exceção em runtime — a cons
 O resultado era o pior caso possível: nenhum erro, nenhuma exceção, e o isolamento simplesmente não valendo. O teste arquitetural não via — ele confere se a anotação existe, não se ela chega a valer.
 
 Hoje as ordens são explícitas em `OrdemDosAspectos`, e `OrdemDoFiltroDeAtleticaTest` trava a invariante: mexer nos números sem entender o efeito quebra o build em vez de vazar dado. A cadeia correta, de fora para dentro, é `@PreAuthorize` → transação → filtro de atlética → método.
+
+---
+
+## O front
+
+Três camadas de tela, com públicos diferentes:
+
+**Rede** — o que só existe olhando várias atléticas juntas. A agenda unificada, o diretório e o quadro de medalhas da temporada. É o que dá nome ao produto: cada atlética já tem grupo de WhatsApp e Instagram; o que nenhuma tem sozinha é a visão do que está acontecendo na rede.
+
+**Público** — a página da atlética e a página do evento, que é o link que circula no WhatsApp. Login só no último passo, na hora de se inscrever: pedir conta antes de dizer do que se trata é pedir crachá para quem só quer saber a hora da festa.
+
+**Hub** — a área de quem administra, com barra lateral: painel, eventos, equipes, torneios, avisos, tarefas, relatórios e membros. A portaria fica deliberadamente fora deste layout — é tela de tarefa única, sem navegação, porque cada elemento a mais é um toque errado esperando acontecer.
+
+### Cada atlética pinta o hub
+
+`atletica.cor_primaria` já existia no schema e era decorativa. Agora o hub inteiro se pinta com ela: entrar no dos Dragões e no das Corujas é visivelmente entrar em lugares diferentes, sem que nenhuma seja dona da plataforma.
+
+O trabalho de verdade está em `ui/tema.ts`: qualquer cor que a diretoria escolher precisa continuar legível. A luminância relativa da WCAG decide se o texto por cima sai branco ou quase preto — é a conta que evita "amarelo com texto branco" —, e a cor é clareada ou escurecida conforme o tema, porque cor fechada some no fundo escuro e cor aberta some no claro. Ao sair do hub o azul da plataforma volta; sem isso, a cor de uma atlética vazaria para a tela de descoberta e a plataforma passaria a parecer dela.
+
+### Modo demonstração
+
+No Vercel só o front está publicado — a API precisa de um Postgres. `dados/index.ts` é uma fachada: com `VITE_MODO_DEMO=true` os dados vêm de uma loja em memória, senão vêm da API.
+
+A loja é **mutável de propósito**. Dá para criar evento, publicar, convidar, cancelar inscrição, mover tarefa e registrar entrada na portaria — e o efeito persiste enquanto a aba estiver aberta. Um demo só de leitura vira catálogo de telas, e ninguém entende um produto olhando print. Recarregar volta tudo ao início, que é o comportamento desejado: cada visitante recebe o mesmo ponto de partida.
+
+Os dados são fictícios, de instituições fictícias, e uma faixa no topo diz isso. Sem ela, alguém abre o link, vê nomes e telefones nas listas de presença e conclui que a plataforma vaza dado de aluno.
+
+**Fases 2 e 3 são só demonstração por enquanto.** Equipes, torneios, tarefas e avisos têm tabela na migration e tela aqui, mas ainda não têm endpoint — o front está à frente do backend, e isso está explícito em cada método da fachada em vez de escondido atrás de um 404.
+
+### Deploy no Vercel
+
+Importe o repositório. O `vercel.json` na raiz cuida do resto: o install padrão é neutralizado (não há `package.json` na raiz), a instalação acontece dentro do `buildCommand`, e o `VITE_MODO_DEMO=true` liga a demonstração. Não é preciso configurar diretório raiz nem variável de ambiente na interface.
 
 ---
 
