@@ -1,29 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "//": [
-    "A PWA vive em web/, e o repositório não tem package.json na raiz. Por",
-    "isso o install padrão é neutralizado e a instalação acontece dentro do",
-    "buildCommand — sem isso o Vercel falha antes de começar, procurando um",
-    "package.json que não existe.",
-    "",
-    "VITE_MODO_DEMO liga a loja em memória. Aqui só o front está publicado:",
-    "a API em Spring precisa de um Postgres, e sem o modo demonstração o",
-    "deploy seria um app bonito que não carrega nada."
-  ],
-
   "installCommand": "echo 'dependencias instaladas no buildCommand'",
-  "buildCommand": "cd web && npm install --no-audit --no-fund && VITE_MODO_DEMO=true npm run build",
+  "buildCommand": "cd web && npm ci --no-audit --no-fund && VITE_MODO_DEMO=true npm run build",
   "outputDirectory": "web/dist",
-
   "rewrites": [
     {
-      "//": "SPA: /hub/dragoes/eventos não existe como arquivo. Sem isto, abrir o link direto devolve 404 e só a navegação interna funciona — bug que aparece exatamente quando alguém compartilha um link.",
-      "source": "/((?!assets/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
-
   "headers": [
     {
       "source": "/(.*)",
@@ -38,14 +23,12 @@
       ]
     },
     {
-      "//": "Nome com hash: o conteúdo nunca muda para um mesmo nome.",
       "source": "/assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {
-      "//": "O service worker precisa ser revalidado sempre, senão o usuário fica preso numa versão antiga do app por dias.",
       "source": "/sw.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, must-revalidate" }

@@ -150,6 +150,10 @@ Os dados são fictícios, de instituições fictícias, e uma faixa no topo diz 
 
 Importe o repositório. O `vercel.json` na raiz cuida do resto: o install padrão é neutralizado (não há `package.json` na raiz), a instalação acontece dentro do `buildCommand`, e o `VITE_MODO_DEMO=true` liga a demonstração. Não é preciso configurar diretório raiz nem variável de ambiente na interface.
 
+**Não coloque comentários no `vercel.json`.** O schema do Vercel é `additionalProperties: false` em todos os níveis, então a convenção `"//"` — que funciona em `package.json` — derruba o deploy com *"should NOT have additional property"*. O motivo de cada linha do arquivo está aqui nesta seção, que é onde ele pode ser lido sem quebrar nada.
+
+O rewrite é `/(.*)` para tudo, sem exceção para `/assets/`. Não é descuido: o Vercel serve arquivo estático existente **antes** de aplicar rewrite, então os assets nunca chegam nessa regra. Um *negative lookahead* ali seria complexidade a mais defendendo contra um caso que não acontece.
+
 ---
 
 ## Permissão
