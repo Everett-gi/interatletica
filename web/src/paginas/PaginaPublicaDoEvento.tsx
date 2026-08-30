@@ -1,167 +1,131 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { entrar, FalhaDaApi } from '../api/cliente'
-import { Api } from '../api/rotas'
-import { Conteudo, MensagemDeErro, useBusca } from '../componentes/comuns'
-import { dataPorExtenso, hora } from '../formatos'
-import { useSessao } from '../sessao/SessaoContexto'
+import { Link, useParams } from 'react-router-dom'
+import { Dados, MODO_DEMO } from '../dados'
 import type { EventoPublico, Inscricao } from '../api/tipos'
+import {
+  Conteudo,
+  Esqueleto,
+  EtiquetaDeTipo,
+  MensagemDeErro,
+  useBusca,
+  Vazio,
+} from '../ui/componentes'
+import { useCorDaAtletica } from '../ui/useCorDaAtletica'
+import { dataPorExtenso, hora, quando } from '../formatos'
+import { useSessao } from '../sessao/SessaoContexto'
 
 /**
  * A tela que abre a partir do link do WhatsApp.
  *
  * <p>É a página mais visitada da plataforma e a única que a maioria das
- * pessoas verá. Por isso ela responde, nesta ordem, as três perguntas de
- * quem clicou: <strong>o que é</strong>, <strong>quando e onde</strong>,
- * <strong>como entro</strong>. Login só é pedido no último passo — antes
- * disso, exigir conta seria pedir crachá para quem só quer saber a hora da
- * festa.</p>
+ * pessoas verá. Responde, nesta ordem, as três perguntas de quem clicou:
+ * <strong>o que é</strong>, <strong>quando e onde</strong>, <strong>como
+ * entro</strong>. Login só no último passo — antes disso, pedir conta é
+ * pedir crachá para quem só quer saber a hora da festa.</p>
  */
 export function PaginaPublicaDoEvento() {
   const { atleticaSlug = '', eventoSlug = '' } = useParams()
 
-  const busca = useBusca<EventoPublico>(
-    () => Api.publico.evento(atleticaSlug, eventoSlug),
+  const busca = useBusca<EventoPublico | null>(
+    () => Dados.eventoPublico(atleticaSlug, eventoSlug),
     [atleticaSlug, eventoSlug],
   )
 
+  const atletica = useBusca(() => Dados.atleticaPublica(atleticaSlug), [atleticaSlug])
+  useCorDaAtletica(atletica.dados?.corPrimaria)
+
   return (
-    <Conteudo busca={busca}>
-      {(evento) => (
-        <article className="pilha" style={{ maxWidth: '40rem', margin: '0 auto' }}>
-          {evento.capaUrl ? (
-            <img
-              src={evento.capaUrl}
-              alt=""
-              style={{
-                width: '100%',
-                borderRadius: 'var(--raio)',
-                aspectRatio: '16 / 9',
-                objectFit: 'cover',
-              }}
-            />
-          ) : null}
-
-          <header>
-            <p className="fraco">{evento.atleticaNome}</p>
-            <h1>{evento.titulo}</h1>
-            {evento.modalidade ? (
-              <span className="etiqueta">{evento.modalidade}</span>
-            ) : null}
-          </header>
-
-          {evento.status === 'CANCELADO' ? (
-            <div className="aviso aviso--erro" role="alert">
-              <strong>Evento cancelado.</strong> Se você estava inscrito, não
-              precisa comparecer.
-            </div>
-          ) : null}
-
-          <section className="cartao">
-            <div className="linha entre">
-              <div>
-                <div className="fraco">Quando</div>
-                <strong>{dataPorExtenso(evento.inicioEm)}</strong>
-                <div className="suave">
-                  {hora(evento.inicioEm)}
-                  {evento.fimEm ? ` às ${hora(evento.fimEm)}` : ''}
-                </div>
-              </div>
-            </div>
-
-            {evento.localNome ? (
-              <div style={{ marginTop: '1rem' }}>
-                <div className="fraco">Onde</div>
-                <strong>{evento.localNome}</strong>
-                {evento.localEndereco ? (
-                  <div className="suave">{evento.localEndereco}</div>
-                ) : null}
-                {evento.localMapaUrl ? (
-                  <a
-                    href={evento.localMapaUrl}
-                    target="_blank"
-                    // noreferrer junto com noopener: sem ele, a página de
-                    // destino recebe o endereço do evento no Referer.
-                    rel="noopener noreferrer"
-                  >
-                    Abrir no mapa
-                  </a>
+    <Conteudo busca={busca} esqueleto={<Esqueleto altura="18rem" />}>
+      {(evento) =>
+        evento === null ? (
+          <Vazio titulo="Evento não encontrado">
+            O link pode ter mudado, ou o evento ainda não foi publicado.
+          </Vazio>
+        ) : (
+          <article className="pilha" style={{ maxWidth: '42rem', margin: '0 auto' }}>
+            <header>
+              <Link to={`/a/${evento.atleticaSlug}`} className="fraco">
+                {evento.atleticaNome}
+              </Link>
+              <h1 style={{ marginTop: '0.2rem' }}>{evento.titulo}</h1>
+              <div className="linha" style={{ gap: '0.35rem' }}>
+                <EtiquetaDeTipo tipo={evento.tipo} />
+                {evento.modalidade ? (
+                  <span className="etiqueta">{evento.modalidade}</span>
                 ) : null}
               </div>
-            ) : null}
-          </section>
+            </header>
 
-          {evento.descricao ? (
+            {evento.status === 'CANCELADO' ? (
+              <div className="aviso aviso--erro" role="alert">
+                <strong>Evento cancelado.</strong> Se você estava inscrito, não
+                precisa comparecer.
+              </div>
+            ) : null}
+
             <section className="cartao">
-              {/* Sem HTML: o texto vem da diretoria e é exibido como texto.
-                  Interpretar markdown aqui abriria injeção de conteúdo numa
-                  página pública, para economizar formatação. */}
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{evento.descricao}</p>
-            </section>
-          ) : null}
+              <div className="fraco">Quando</div>
+              <strong>{dataPorExtenso(evento.inicioEm)}</strong>
+              <div className="suave">
+                {hora(evento.inicioEm)}
+                {evento.fimEm ? ` às ${hora(evento.fimEm)}` : ''}
+                {' · '}{quando(evento.inicioEm)}
+              </div>
 
-          <Inscricao_ evento={evento} />
-        </article>
-      )}
+              {evento.localNome ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <div className="fraco">Onde</div>
+                  <strong>{evento.localNome}</strong>
+                  {evento.localEndereco ? (
+                    <div className="suave">{evento.localEndereco}</div>
+                  ) : null}
+                  {evento.localMapaUrl ? (
+                    // noreferrer junto com noopener: sem ele o destino recebe
+                    // o endereço do evento no cabeçalho Referer.
+                    <a href={evento.localMapaUrl} target="_blank"
+                       rel="noopener noreferrer">
+                      Abrir no mapa
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+
+            {evento.descricao ? (
+              <section className="cartao">
+                {/* Texto puro, sem HTML: a descrição vem da diretoria, e
+                    interpretar markdown numa página pública abriria injeção
+                    de conteúdo para economizar formatação. */}
+                <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{evento.descricao}</p>
+              </section>
+            ) : null}
+
+            <BlocoDeInscricao evento={evento} />
+          </article>
+        )
+      }
     </Conteudo>
   )
 }
 
-/** O bloco de inscrição, que é onde a página deixa de ser cartaz e vira app. */
-function Inscricao_({ evento }: { evento: EventoPublico }) {
-  const { perfil } = useSessao()
+/** Onde a página deixa de ser cartaz e vira aplicação. */
+function BlocoDeInscricao({ evento }: { evento: EventoPublico }) {
+  const { perfil, assumirPapel } = useSessao()
 
   const minha = useBusca<Inscricao | null>(
-    () =>
-      perfil
-        ? Api.inscricao.minha(evento.atleticaSlug, evento.id)
-        : Promise.resolve(null),
+    () => (perfil ? Dados.minhaInscricao(evento.atleticaSlug, evento.id)
+                  : Promise.resolve(null)),
     [evento.id, perfil?.id],
   )
 
-  const [inscricao, setInscricao] = useState<Inscricao | null>(null)
   const [trabalhando, setTrabalhando] = useState(false)
   const [falha, setFalha] = useState<unknown>(null)
 
-  const atual = inscricao ?? minha.dados
-
-  async function inscrever() {
+  async function executar(acao: () => Promise<unknown>) {
     setTrabalhando(true)
     setFalha(null)
     try {
-      // A atlética de origem fica nula: com um vínculo só, o servidor
-      // resolve sozinho. Se a pessoa tiver vários, ele responde
-      // ORIGEM_AMBIGUA e o seletor aparece abaixo.
-      setInscricao(
-        await Api.inscricao.criar(evento.atleticaSlug, evento.id, null, null),
-      )
-    } catch (erro) {
-      setFalha(erro)
-    } finally {
-      setTrabalhando(false)
-    }
-  }
-
-  async function escolherOrigem(slug: string) {
-    setTrabalhando(true)
-    setFalha(null)
-    try {
-      setInscricao(
-        await Api.inscricao.criar(evento.atleticaSlug, evento.id, null, slug),
-      )
-    } catch (erro) {
-      setFalha(erro)
-    } finally {
-      setTrabalhando(false)
-    }
-  }
-
-  async function cancelar() {
-    setTrabalhando(true)
-    setFalha(null)
-    try {
-      await Api.inscricao.cancelar(evento.atleticaSlug, evento.id)
-      setInscricao(null)
+      await acao()
       minha.recarregar()
     } catch (erro) {
       setFalha(erro)
@@ -170,8 +134,15 @@ function Inscricao_({ evento }: { evento: EventoPublico }) {
     }
   }
 
-  if (atual) {
-    return <Comprovante inscricao={atual} onCancelar={cancelar} ocupado={trabalhando} />
+  if (minha.dados) {
+    return (
+      <Comprovante
+        inscricao={minha.dados}
+        ocupado={trabalhando}
+        aoCancelar={() =>
+          executar(() => Dados.cancelarInscricao(evento.atleticaSlug, evento.id))}
+      />
+    )
   }
 
   if (!evento.inscricaoAberta) {
@@ -189,79 +160,64 @@ function Inscricao_({ evento }: { evento: EventoPublico }) {
     )
   }
 
-  const ambigua =
-    falha instanceof FalhaDaApi && falha.codigo === 'ORIGEM_AMBIGUA'
+  const lotado = evento.vagasRestantes === 0
 
   return (
     <section className="cartao">
-      <div className="linha entre" style={{ marginBottom: '0.75rem' }}>
+      <div className="linha entre" style={{ marginBottom: '0.8rem' }}>
         <span className="suave">
           {evento.inscritosConfirmados} inscrito
           {evento.inscritosConfirmados === 1 ? '' : 's'}
         </span>
         {evento.vagasRestantes !== null ? (
-          <span className={evento.vagasRestantes === 0 ? 'etiqueta' : 'etiqueta etiqueta--publicado'}>
-            {evento.vagasRestantes === 0
+          <span className={`etiqueta ${lotado ? 'etiqueta--alerta' : 'etiqueta--sucesso'}`}>
+            {lotado
               ? 'Lotado — entra na espera'
               : `${evento.vagasRestantes} vaga${evento.vagasRestantes === 1 ? '' : 's'}`}
           </span>
         ) : null}
       </div>
 
-      {falha && !ambigua ? <MensagemDeErro erro={falha} /> : null}
+      {falha ? <MensagemDeErro erro={falha} /> : null}
 
-      {ambigua && perfil ? (
-        <div>
-          <p className="suave">Por qual atlética você está se inscrevendo?</p>
-          <div className="pilha">
-            {perfil.atleticas.map(({ atletica }) => (
-              <button
-                key={atletica.slug}
-                className="botao botao--discreto botao--largo"
-                disabled={trabalhando}
-                onClick={() => void escolherOrigem(atletica.slug)}
-              >
-                {atletica.nome}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : perfil ? (
+      {perfil ? (
         <button
           className="botao botao--largo"
           disabled={trabalhando}
-          onClick={() => void inscrever()}
+          onClick={() =>
+            void executar(() => Dados.inscrever(evento.atleticaSlug, evento.id))}
         >
-          {trabalhando ? 'Confirmando…' : 'Quero ir'}
+          {trabalhando ? 'Confirmando…' : lotado ? 'Entrar na lista de espera' : 'Quero ir'}
+        </button>
+      ) : MODO_DEMO ? (
+        <button className="botao botao--largo"
+                onClick={() => void assumirPapel('MEMBRO')}>
+          Entrar na demonstração para se inscrever
         </button>
       ) : (
-        <button className="botao botao--largo" onClick={entrar}>
+        <a className="botao botao--largo" href="/oauth2/authorization/google">
           Entrar com Google para se inscrever
-        </button>
+        </a>
       )}
     </section>
   )
 }
 
 /**
- * O comprovante. O token do QR aparece como texto grande e legível: a leitura
- * na portaria é por câmera, mas quando a câmera falha — e falha, no escuro do
+ * O comprovante. O código aparece como texto grande e legível: a leitura na
+ * portaria é por câmera, mas quando a câmera falha — e falha, no escuro do
  * ginásio — alguém digita.
  */
-function Comprovante({
-  inscricao,
-  onCancelar,
-  ocupado,
-}: {
+function Comprovante({ inscricao, aoCancelar, ocupado }: {
   inscricao: Inscricao
-  onCancelar: () => Promise<void>
+  aoCancelar: () => void
   ocupado: boolean
 }) {
   const naEspera = inscricao.status === 'LISTA_ESPERA'
 
   return (
     <section className="cartao">
-      <div className={naEspera ? 'aviso' : 'aviso aviso--sucesso'}>
+      <div className={naEspera ? 'aviso aviso--alerta' : 'aviso aviso--sucesso'}>
         {naEspera ? (
           <>
             <strong>Você está na lista de espera</strong>
@@ -276,29 +232,28 @@ function Comprovante({
       </div>
 
       {!naEspera ? (
-        <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+        <div style={{ textAlign: 'center', margin: '1.1rem 0' }}>
           <div className="fraco">Código de entrada</div>
           <code
             style={{
-              display: 'block',
-              fontSize: '1.05rem',
-              letterSpacing: '0.08em',
-              wordBreak: 'break-all',
-              padding: '0.5rem',
+              display: 'block', fontSize: '1.05rem', letterSpacing: '0.08em',
+              wordBreak: 'break-all', padding: '0.5rem',
             }}
           >
             {inscricao.checkinToken}
           </code>
           {inscricao.checkinEm ? (
             <p className="fraco">Entrada já registrada.</p>
-          ) : null}
+          ) : (
+            <p className="fraco">Apresente este código na portaria.</p>
+          )}
         </div>
       ) : null}
 
       <button
         className="botao botao--perigo botao--largo"
         disabled={ocupado}
-        onClick={() => void onCancelar()}
+        onClick={aoCancelar}
       >
         {ocupado ? 'Cancelando…' : 'Cancelar inscrição'}
       </button>

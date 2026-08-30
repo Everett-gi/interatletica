@@ -7,67 +7,66 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { Api } from '../api/rotas'
+import { Dados, MODO_DEMO } from '../dados'
 import type { MinhaAtletica, Papel, PerfilDaSessao } from '../api/tipos'
+import { aparenciaSalva, aplicarAparencia, type Aparencia } from '../ui/tema'
 
 /**
- * Quem está logado, onde tem vínculo e com que papel.
+ * Quem está logado, onde tem vínculo, com que papel — e a aparência.
  *
- * <p>Carregado uma vez na abertura do app. Toda tela pergunta a este
- * contexto em vez de refazer {@code GET /api/eu} — que é a chamada mais
- * repetida de qualquer SPA com sessão, e a que mais aparece duplicada na aba
- * de rede quando cada componente resolve buscar sozinho.</p>
+ * <p>Carregado uma vez na abertura. Toda tela pergunta aqui em vez de
+ * refazer a chamada de sessão, que é a requisição mais duplicada de
+ * qualquer SPA quando cada componente resolve buscar sozinho.</p>
  */
 
 interface Sessao {
   perfil: PerfilDaSessao | null
   carregando: boolean
-  /** Recarrega depois de aceitar convite ou mudar de papel. */
   recarregar: () => Promise<void>
-  /** O vínculo com uma atlética, ou null se não houver. */
   vinculo: (slug: string) => MinhaAtletica | null
-  /** Papel suficiente naquela atlética, seguindo a hierarquia do servidor. */
   podeAtuarComo: (slug: string, exigido: Papel) => boolean
+  aparencia: Aparencia
+  trocarAparencia: () => void
+  /** Só no modo demonstração: troca o papel para mostrar o que cada um vê. */
+  assumirPapel: (papel: Papel | 'VISITANTE') => Promise<void>
 }
 
 const ContextoDeSessao = createContext<Sessao | null>(null)
 
 /**
- * A mesma hierarquia de {@code Papel.podeAtuarComo} no servidor.
+ * A mesma hierarquia de `Papel.podeAtuarComo` no servidor.
  *
  * <p>Duplicar regra de permissão no cliente é aceitável aqui, e só aqui,
- * porque o que ela decide é o que APARECE na tela — nunca o que é permitido.
- * Quem autoriza de verdade é o {@code @PreAuthorize} do servidor; esconder o
- * botão é cortesia, não segurança.</p>
+ * porque o que ela decide é o que APARECE. Quem autoriza é o
+ * `@PreAuthorize` do servidor; esconder o botão é cortesia, não segurança.</p>
  */
-const FORCA: Record<Papel, number> = {
-  PRESIDENTE: 0,
-  DIRETOR: 1,
-  MEMBRO: 2,
-}
+const FORCA: Record<Papel, number> = { PRESIDENTE: 0, DIRETOR: 1, MEMBRO: 2 }
 
 export function ProvedorDeSessao({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<PerfilDaSessao | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const [aparencia, setAparencia] = useState<Aparencia>(() => aparenciaSalva())
+
+  useEffect(() => {
+    aplicarAparencia(aparencia)
+  }, [aparencia])
 
   const carregar = useCallback(async () => {
     try {
-      setPerfil(await Api.sessao())
+      setPerfil(await Dados.sessao())
     } catch {
       // Falha de rede na abertura não pode virar tela de erro: o visitante
-      // deslogado precisa ver a vitrine mesmo assim. Segue como anônimo.
+      // deslogado precisa ver a descoberta mesmo assim.
       setPerfil(null)
     } finally {
       setCarregando(false)
     }
   }, [])
 
-  useEffect(() => {
-    void carregar()
-  }, [carregar])
+  useEffect(() => { void carregar() }, [carregar])
 
   const valor = useMemo<Sessao>(() => {
-    const vinculo = (slug: string): MinhaAtletica | null =>
+    const vinculo = (slug: string) =>
       perfil?.atleticas.find((a) => a.atletica.slug === slug) ?? null
 
     return {
@@ -79,12 +78,17 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
         const meu = vinculo(slug)
         return meu !== null && FORCA[meu.papel] <= FORCA[exigido]
       },
+      aparencia,
+      trocarAparencia: () =>
+        setAparencia((atual) => (atual === 'escura' ? 'clara' : 'escura')),
+      assumirPapel: async (papel) => {
+        if (!MODO_DEMO) return
+        setPerfil(await Dados.assumirPapel(papel))
+      },
     }
-  }, [perfil, carregando, carregar])
+  }, [perfil, carregando, carregar, aparencia])
 
-  return (
-    <ContextoDeSessao.Provider value={valor}>{children}</ContextoDeSessao.Provider>
-  )
+  return <ContextoDeSessao.Provider value={valor}>{children}</ContextoDeSessao.Provider>
 }
 
 export function useSessao(): Sessao {

@@ -102,19 +102,16 @@ jobs:
       - name: Preparar Node 22
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
-          # Sem `cache: npm` de propósito: o cache do setup-node exige um
-          # lockfile e falha o job inteiro quando não encontra um. Assim
-          # que package-lock.json for commitado, acrescente
-          # `cache: npm` aqui e troque o passo abaixo por `npm ci`.
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Instalar dependências
         working-directory: web
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
-          fi
+        # ci, e não install: instala exatamente o que está no lockfile e
+        # falha se package.json e lockfile divergirem — que é o que se quer
+        # de um build reproduzível.
+        run: npm ci --no-audit --no-fund
 
       - name: Verificar tipos
         working-directory: web
@@ -124,15 +121,8 @@ jobs:
 
       - name: Construir
         working-directory: web
+        # VITE_MODO_DEMO igual ao do Vercel: se o modo demonstração quebrar
+        # o build, é aqui que se descobre, e não no deploy.
+        env:
+          VITE_MODO_DEMO: "true"
         run: npm run build
-
-      - name: Guardar o lockfile gerado
-        # Enquanto não houver package-lock.json no repositório, cada
-        # execução resolve as versões de novo e o build não é
-        # reproduzível. Este artefato é o lockfile pronto para commitar.
-        if: hashFiles('web/package-lock.json') != ''
-        uses: actions/upload-artifact@v5
-        with:
-          name: package-lock
-          path: web/package-lock.json
-          retention-days: 7

@@ -27,3 +27,6 @@ Thumbs.db
 # Runtime
 *.log
 backups/
+
+# Build do front
+web/dist/

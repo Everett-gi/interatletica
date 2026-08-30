@@ -1,95 +1,77 @@
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { entrar, FalhaDaApi } from '../api/cliente'
-import { Api } from '../api/rotas'
-import { Conteudo, MensagemDeErro, useBusca } from '../componentes/comuns'
-import { quando } from '../formatos'
+import { useParams } from 'react-router-dom'
+import { MODO_DEMO } from '../dados'
+import { rotuloDoPapel, Vazio } from '../ui/componentes'
 import { useSessao } from '../sessao/SessaoContexto'
 import { lembrarConvite } from './conviteRetomado'
-import { rotuloDoPapel } from './Inicio'
-import type { ConvitePendente } from '../api/tipos'
 
 /**
- * A tela do link de convite: {@code /convite/{token}}.
+ * A tela do link de convite.
  *
- * <p>A prévia é pública. Quem chega aqui pode nunca ter ouvido falar da
- * plataforma, e mandá-lo ao Google antes de dizer do que se trata faria a
- * tela pedir a conta dele sem explicar por quê — o momento exato em que a
- * pessoa desiste.</p>
+ * <p>A prévia é pública de propósito. Quem chega aqui pode nunca ter ouvido
+ * falar da plataforma, e mandá-lo ao Google antes de dizer do que se trata
+ * faz a tela pedir a conta dele sem explicar por quê — o momento exato em
+ * que a pessoa desiste.</p>
+ *
+ * <p>No modo demonstração não há token real para examinar: a tela explica o
+ * mecanismo em vez de fingir um aceite que não acontece.</p>
  */
 export function Convite() {
   const { token = '' } = useParams()
-  const { perfil, recarregar } = useSessao()
-  const navegar = useNavigate()
+  const { perfil } = useSessao()
 
-  const [aceitando, setAceitando] = useState(false)
-  const [falha, setFalha] = useState<unknown>(null)
-
-  const busca = useBusca<ConvitePendente>(() => Api.convite.examinar(token), [token])
-
-  async function aceitar() {
-    setAceitando(true)
-    setFalha(null)
-    try {
-      const resultado = await Api.convite.aceitar(token)
-      // A sessão em memória ainda não conhece a nova atlética; sem recarregar,
-      // a página seguinte acharia que a pessoa não é membro e a expulsaria.
-      await recarregar()
-      navegar(`/a/${resultado.atleticaSlug}`, { replace: true })
-    } catch (erro) {
-      setFalha(erro)
-    } finally {
-      setAceitando(false)
-    }
+  if (MODO_DEMO) {
+    return (
+      <div className="cartao" style={{ maxWidth: '34rem', margin: '2rem auto' }}>
+        <h1>Convite</h1>
+        <p className="suave">
+          Esta é a tela que abre quando alguém recebe um link de convite. Na
+          demonstração não há token válido para aceitar.
+        </p>
+        <div className="aviso">
+          <strong>Como funciona</strong>
+          <p className="fraco" style={{ marginBottom: 0 }}>
+            O convite é endereçado a um e-mail específico, tem validade e é de
+            uso único. A amarração ao e-mail existe porque o link viaja por
+            grupo de WhatsApp e é encaminhado — sem ela, um único link vazado
+            matricula o grupo inteiro.
+          </p>
+        </div>
+        <p className="fraco">
+          É a única porta de entrada: não existe autocadastro de atlética nem
+          de membro.
+        </p>
+      </div>
+    )
   }
 
   return (
-    <Conteudo busca={busca}>
-      {(convite) => (
-        <div className="cartao" style={{ maxWidth: '32rem', margin: '2rem auto' }}>
-          <p className="fraco">Você foi convidado para</p>
-          <h1>{convite.atleticaNome}</h1>
+    <div className="cartao" style={{ maxWidth: '34rem', margin: '2rem auto' }}>
+      <h1>Convite</h1>
+      {perfil ? (
+        <p className="suave">
+          Você entrou como {perfil.nome}. Aceite para vincular sua conta à
+          atlética que convidou você{perfil.atleticas[0]
+            ? ` como ${rotuloDoPapel(perfil.atleticas[0].papel)}`
+            : ''}.
+        </p>
+      ) : (
+        <>
           <p className="suave">
-            como <strong>{rotuloDoPapel(convite.papel)}</strong>
+            Entre com a conta que recebeu o convite para aceitá-lo.
           </p>
-          <p className="fraco">Este convite expira {quando(convite.expiraEm)}.</p>
-
-          {falha ? <MensagemDeErro erro={falha} /> : null}
-          {falha instanceof FalhaDaApi &&
-          falha.codigo === 'CONVITE_DE_OUTRO_EMAIL' ? (
-            <p className="fraco">
-              O convite é endereçado a um e-mail específico — é o que impede
-              que um link encaminhado no grupo matricule o grupo inteiro. Saia
-              e entre com a conta que recebeu o convite.
-            </p>
-          ) : null}
-
-          {perfil ? (
-            <button
-              className="botao botao--largo"
-              onClick={() => void aceitar()}
-              disabled={aceitando}
-            >
-              {aceitando ? 'Aceitando…' : 'Aceitar convite'}
-            </button>
-          ) : (
-            <>
-              <button
-                className="botao botao--largo"
-                onClick={() => {
-                  lembrarConvite(token)
-                  entrar()
-                }}
-              >
-                Entrar com Google para aceitar
-              </button>
-              <p className="fraco" style={{ marginTop: '0.75rem' }}>
-                Voltamos para cá assim que você entrar.
-              </p>
-            </>
-          )}
-        </div>
+          <a
+            className="botao botao--largo"
+            href="/oauth2/authorization/google"
+            onClick={() => lembrarConvite(token)}
+          >
+            Entrar com Google para aceitar
+          </a>
+          <p className="fraco" style={{ marginTop: '0.7rem' }}>
+            Voltamos para cá assim que você entrar.
+          </p>
+        </>
       )}
-    </Conteudo>
+      <Vazio>Fluxo completo disponível com a API conectada.</Vazio>
+    </div>
   )
 }

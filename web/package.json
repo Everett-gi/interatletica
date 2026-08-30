@@ -3,6 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "//": [
+    "overrides troca o rollup nativo pelo build oficial em WebAssembly.",
+    "Motivo: a maquina de desenvolvimento do projeto tem uma politica de",
+    "Application Control do Windows que bloqueia o .node do rollup, e sem",
+    "a troca nem o dev server nem o build sobem ali. O @rollup/wasm-node e",
+    "canal de distribuicao suportado do proprio rollup, nao um contorno.",
+    "Custo: alguns segundos a mais no build. Se um dia a politica sair, da",
+    "para remover este bloco e voltar ao binario nativo."
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -21,5 +30,8 @@
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
     "vite-plugin-pwa": "^0.20.5"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.24.0"
   }
 }
