@@ -457,6 +457,14 @@ export const lojaDemo = {
   torneio: (id: string) =>
     responder(estado.torneios.find((t) => t.id === id) ?? null),
 
+  /**
+   * O torneio de um evento. Um campeonato NAO e uma entidade paralela ao
+   * evento: ele acontece dentro de um. O schema ja dizia isso — torneio
+   * tem evento_id obrigatorio — e a interface passa a dizer tambem.
+   */
+  torneioDoEvento: (eventoId: string) =>
+    responder(estado.torneios.find((t) => t.eventoId === eventoId) ?? null),
+
   registrarPlacar(
     torneioId: string, partidaId: string, placarA: number, placarB: number,
   ): Promise<Torneio | null> {

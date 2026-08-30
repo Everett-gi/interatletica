@@ -360,3 +360,26 @@ export function Dialogo({ titulo, aoFechar, children }: {
     </div>
   )
 }
+
+/**
+ * Marca uma tela cuja tabela existe no banco mas cujo endpoint ainda não
+ * foi escrito.
+ *
+ * <p>Sem isso, metade da navegação leva a telas que parecem funcionar e não
+ * salvam nada — e quem testa conclui que o sistema é instável, em vez de
+ * incompleto. Dizer "ainda não" em voz alta custa menos que essa confusão.</p>
+ */
+export function Previa({ oQueFalta }: { oQueFalta: string }) {
+  return (
+    <div className="aviso aviso--alerta" style={{ marginBottom: '1rem' }}>
+      <div className="linha" style={{ gap: '0.5rem' }}>
+        <span className="etiqueta etiqueta--alerta">prévia</span>
+        <strong>Esta tela ainda não salva de verdade</strong>
+      </div>
+      <p className="fraco" style={{ margin: '0.3rem 0 0' }}>
+        {oQueFalta} O banco já tem a tabela; falta o endpoint na API. Até lá,
+        o que você fizer aqui vale só nesta aba.
+      </p>
+    </div>
+  )
+}

@@ -8,6 +8,7 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
+import { Previa } from '../../ui/componentes'
 import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { useSessao } from '../../sessao/SessaoContexto'
 
@@ -49,6 +50,8 @@ export function Equipes() {
           </button>
         ) : null}
       </header>
+
+      <Previa oQueFalta="Cadastrar e editar elenco ainda não chega ao servidor." />
 
       <Conteudo
         busca={equipes}

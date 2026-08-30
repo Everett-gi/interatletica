@@ -85,6 +85,7 @@ export const Dados = {
   equipes: lojaDemo.equipes,
   torneios: lojaDemo.torneios,
   torneio: lojaDemo.torneio,
+  torneioDoEvento: lojaDemo.torneioDoEvento,
   registrarPlacar: lojaDemo.registrarPlacar,
   tarefas: lojaDemo.tarefas,
   moverTarefa: lojaDemo.moverTarefa,

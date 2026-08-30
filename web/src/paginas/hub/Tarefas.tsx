@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { PrioridadeDaTarefa, StatusDaTarefa, Tarefa } from '../../api/tipos-rede'
 import { Avatar, Conteudo, Esqueleto, useBusca } from '../../ui/componentes'
+import { Previa } from '../../ui/componentes'
 import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
@@ -70,6 +71,8 @@ export function Tarefas() {
           lista simples não responde.
         </p>
       </header>
+
+      <Previa oQueFalta="Criar e mover tarefa ainda não chega ao servidor." />
 
       <div className="linha">
         <input

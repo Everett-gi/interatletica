@@ -435,6 +435,15 @@ const PRENOMES = ['Ana', 'Bruno', 'Carla', 'Daniel', 'Elisa', 'Felipe',
   'Gabriela', 'Henrique', 'Iara', 'João', 'Karen', 'Lucas', 'Mariana',
   'Nícolas', 'Olívia', 'Paulo', 'Renata', 'Sérgio']
 
+/**
+ * Tira o acento em vez de trocá-lo por outro caractere: "Nícolas" precisa
+ * virar "nicolas", e não "n.colas". Metade dos nomes brasileiros tem acento,
+ * então errar isso deixa a lista de presença inteira com cara de defeito.
+ */
+function semAcento(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 /** Gerador determinístico: a lista precisa ser a mesma a cada carregamento. */
 export function participantesDoEvento(eventoId: string, quantidade: number): Participante[] {
   const alvo = EVENTOS.find((e) => e.id === eventoId)
@@ -451,7 +460,7 @@ export function participantesDoEvento(eventoId: string, quantidade: number): Par
       inscricaoId: `i-${eventoId}-${i}`,
       usuarioId: `u-demo-${i}`,
       nome,
-      email: `${nome.toLowerCase().replace(/[^a-z]/g, '.')}@exemplo`,
+      email: `${semAcento(nome).toLowerCase().replace(/\s+/g, '.')}@exemplo.br`,
       telefone: `(1${n % 9}) 9${(10000 + n * 137) % 90000}-${(1000 + n * 31) % 9000}`,
       atleticaDeOrigem: n % 7 === 0 ? null : origem.slug,
       status: excedente ? 'LISTA_ESPERA' : 'CONFIRMADA',

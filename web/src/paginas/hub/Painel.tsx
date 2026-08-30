@@ -34,11 +34,11 @@ export function Painel() {
 
   return (
     <div className="pilha" style={{ gap: '1.6rem' }}>
+      {/* Sem repetir o nome da atlética: o cabeçalho do hub, logo acima, já
+          diz onde você está e com que papel. Dizer de novo aqui empurrava o
+          conteúdo para baixo sem informar nada. */}
       <header className="linha entre">
-        <div>
-          <h1 style={{ marginBottom: '0.1rem' }}>{meu?.atletica.nome ?? 'Atlética'}</h1>
-          <div className="fraco">{meu?.cargo ?? 'Painel da diretoria'}</div>
-        </div>
+        <h1 style={{ margin: 0 }}>Início</h1>
         {diretor ? (
           <Link to={`/hub/${slug}/eventos/novo`} className="botao">Novo evento</Link>
         ) : null}
@@ -138,6 +138,16 @@ export function Painel() {
                 <section className="cartao">
                   <h3>Presença</h3>
                   <Anel proporcao={dados.taxaDePresenca} rotulo="Compareceram" />
+                  {/* Relatórios saiu da navegação: era quase o mesmo que este
+                      painel, com outro nome. Fica alcançável de onde os
+                      números já estão. */}
+                  <Link
+                    to={`/hub/${slug}/relatorios`}
+                    className="botao botao--discreto botao--pequeno"
+                    style={{ marginTop: '0.9rem' }}
+                  >
+                    Ver todos os números
+                  </Link>
                 </section>
               </div>
             ) : null}

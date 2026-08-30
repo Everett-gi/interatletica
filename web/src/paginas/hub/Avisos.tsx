@@ -9,6 +9,7 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
+import { Previa } from '../../ui/componentes'
 import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
@@ -52,6 +53,8 @@ export function Avisos() {
           </button>
         ) : null}
       </header>
+
+      <Previa oQueFalta="Publicar aviso ainda não chega ao servidor, e ninguém é notificado." />
 
       {compondo ? (
         <Compositor

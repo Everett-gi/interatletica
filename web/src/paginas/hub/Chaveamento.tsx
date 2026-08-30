@@ -9,6 +9,7 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
+import { Previa } from '../../ui/componentes'
 import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { dataEHora } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
@@ -23,12 +24,13 @@ import { useSessao } from '../../sessao/SessaoContexto'
  * automaticamente — que é o que acontece ao salvar aqui.</p>
  */
 export function Chaveamento() {
-  const { slug = '', torneioId = '' } = useParams()
+  const { slug = '', eventoId = '' } = useParams()
   const { vinculo, podeAtuarComo } = useSessao()
   useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
 
   const diretor = podeAtuarComo(slug, 'DIRETOR')
-  const busca = useBusca<Torneio | null>(() => Dados.torneio(torneioId), [torneioId])
+  const busca = useBusca<Torneio | null>(
+    () => Dados.torneioDoEvento(eventoId), [eventoId])
   const [emEdicao, setEmEdicao] = useState<Partida | null>(null)
 
   if (busca.carregando) return <Carregando />
@@ -42,12 +44,16 @@ export function Chaveamento() {
   return (
     <div className="pilha">
       <header>
-        <Link to={`/hub/${slug}/torneios`} className="fraco">← Torneios</Link>
+        <Link to={`/hub/${slug}/eventos/${eventoId}`} className="fraco">
+          ← Voltar ao evento
+        </Link>
         <h1 style={{ marginTop: '0.3rem' }}>{torneio.nome}</h1>
         <div className="fraco">
           {torneio.modalidade} · {torneio.participantes.length} participantes
         </div>
       </header>
+
+      <Previa oQueFalta="Registrar placar ainda não chega ao servidor." />
 
       <div className="chave">
         {rodadas.map(({ rodada, partidas }) => (

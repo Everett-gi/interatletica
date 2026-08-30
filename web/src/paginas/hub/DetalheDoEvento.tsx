@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { Evento, Participante, StatusDoEvento } from '../../api/tipos'
+import type { Torneio as TorneioDto } from '../../api/tipos-rede'
 import {
   Abas,
   Carregando,
@@ -83,6 +84,9 @@ export function DetalheDoEvento() {
 
       {evento.status === 'PUBLICADO' ? <LinkPublico link={linkPublico} /> : null}
 
+      <Torneio slug={slug} eventoId={eventoId} />
+
+
       {diretor ? (
         <section className="cartao">
           <h3>Ações</h3>
@@ -130,6 +134,49 @@ export function DetalheDoEvento() {
 }
 
 /**
+ * O torneio deste evento, se houver.
+ *
+ * <p>Fica aqui, e não numa seção "Torneios" na navegação, porque um
+ * campeonato É um evento — o schema sempre disse isso, com
+ * {@code torneio.evento_id} obrigatório. Separar os dois obrigava a pessoa
+ * a adivinhar em qual das duas seções procurar a mesma coisa.</p>
+ */
+function Torneio({ slug, eventoId }: { slug: string; eventoId: string }) {
+  const busca = useBusca<TorneioDto | null>(
+    () => Dados.torneioDoEvento(eventoId), [eventoId])
+
+  if (busca.carregando || !busca.dados) {
+    return null
+  }
+
+  const torneio = busca.dados
+  const encerradas = torneio.partidas.filter((p) => p.status === 'ENCERRADA').length
+  const emAndamento = torneio.partidas.some((p) => p.status === 'EM_ANDAMENTO')
+
+  return (
+    <section className="cartao">
+      <div className="linha entre">
+        <div>
+          <div className="linha" style={{ gap: '0.4rem', marginBottom: '0.2rem' }}>
+            <h3 style={{ margin: 0 }}>Chaveamento</h3>
+            {emAndamento ? (
+              <span className="etiqueta etiqueta--sucesso">● ao vivo</span>
+            ) : null}
+          </div>
+          <div className="fraco">
+            {torneio.modalidade} · {torneio.participantes.length} participantes ·{' '}
+            {encerradas} de {torneio.partidas.length} partidas
+          </div>
+        </div>
+        <Link to={`/hub/${slug}/eventos/${eventoId}/torneio`} className="botao">
+          Abrir chaveamento
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+/**
  * O link que a diretoria cola no grupo. Copiar com um toque, porque a
  * alternativa é selecionar da barra de endereços no celular.
  */
@@ -170,6 +217,15 @@ function ListaDePresenca({ slug, eventoId }: { slug: string; eventoId: string })
   const [busca, setBusca] = useState('')
   const lista = useBusca<Participante[]>(() => Dados.participantes(slug, eventoId),
     [slug, eventoId])
+
+  // A coluna de origem guarda o slug. Mostrar "LEOES" numa lista impressa
+  // não diz nada a quem está na portaria — o nome da atlética, sim.
+  const atleticas = useBusca(() => Dados.vitrine(), [])
+  const nomeDaOrigem = (slugDaOrigem: string | null) => {
+    if (!slugDaOrigem) return null
+    const encontrada = atleticas.dados?.find((a) => a.slug === slugDaOrigem)
+    return encontrada?.sigla ?? encontrada?.nome ?? slugDaOrigem
+  }
 
   function filtrar(pessoas: Participante[]): Participante[] {
     const termo = busca.trim().toLowerCase()
@@ -249,7 +305,7 @@ function ListaDePresenca({ slug, eventoId }: { slug: string; eventoId: string })
                       <td className="fraco">{p.email ?? '—'}</td>
                       <td>
                         {p.atleticaDeOrigem
-                          ? <span className="etiqueta">{p.atleticaDeOrigem}</span>
+                          ? <span className="etiqueta">{nomeDaOrigem(p.atleticaDeOrigem)}</span>
                           : <span className="fraco">sem atlética</span>}
                       </td>
                       <td>
