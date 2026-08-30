@@ -32,7 +32,7 @@ export function Convite() {
           <p className="fraco" style={{ marginBottom: 0 }}>
             O convite é endereçado a um e-mail específico, tem validade e é de
             uso único. A amarração ao e-mail existe porque o link viaja por
-            grupo de WhatsApp e é encaminhado — sem ela, um único link vazado
+            grupo de WhatsApp e é encaminhado. Sem ela, um único link vazado
             matricula o grupo inteiro.
           </p>
         </div>

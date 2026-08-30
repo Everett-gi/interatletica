@@ -153,7 +153,7 @@ function Compositor({ slug, aoPublicar }: {
                 onChange={(e) => setPublico(e.target.value as PublicoDoAviso)}>
           {(Object.keys(PUBLICO) as PublicoDoAviso[]).map((chave) => (
             <option key={chave} value={chave}>
-              {PUBLICO[chave].rotulo} — {PUBLICO[chave].explica}
+              {PUBLICO[chave].rotulo}: {PUBLICO[chave].explica}
             </option>
           ))}
         </select>

@@ -148,7 +148,7 @@ function Confronto({ partida, porId, aoEditar }: {
 
       <div className="confronto__rodape">
         <span>
-          {emAndamento ? '● ao vivo' : partida.inicioEm ? dataEHora(partida.inicioEm) : '—'}
+          {emAndamento ? '● ao vivo' : partida.inicioEm ? dataEHora(partida.inicioEm) : 'sem horário'}
         </span>
         {aoEditar && partida.participanteAId && partida.participanteBId ? (
           <button
@@ -191,7 +191,7 @@ function DialogoDePlacar({ torneioId, partida, porId, aoFechar, aoSalvar }: {
   return (
     <Dialogo titulo={partida.rotulo ?? 'Registrar placar'} aoFechar={aoFechar}>
       <p className="fraco">
-        Melhor de {partida.melhorDe} — vence quem chegar a {vitoriasNecessarias}.
+        Melhor de {partida.melhorDe}. Vence quem chegar a {vitoriasNecessarias}.
       </p>
 
       <div className="pilha pilha--densa">
@@ -206,10 +206,9 @@ function DialogoDePlacar({ torneioId, partida, porId, aoFechar, aoSalvar }: {
         </p>
       ) : (
         <div className="aviso aviso--sucesso" style={{ marginTop: '0.7rem' }}>
-          {a > b ? nomeA : nomeB} avança
           {partida.proximaPartidaId
-            ? ' para o slot ' + partida.slotProximo + ' da próxima partida.'
-            : ' — é a final.'}
+            ? `${a > b ? nomeA : nomeB} avança para a vaga ${partida.slotProximo} da próxima partida.`
+            : `${a > b ? nomeA : nomeB} é o campeão do torneio.`}
         </div>
       )}
 

@@ -126,7 +126,7 @@ function Podio({ linhas }: { linhas: LinhaDoQuadroDeMedalhas[] }) {
 
 function Variacao({ valor }: { valor: number }) {
   if (valor === 0) {
-    return <span className="fraco" aria-label="sem mudança">—</span>
+    return <span className="fraco" aria-label="sem mudança">=</span>
   }
   const subiu = valor > 0
   return (

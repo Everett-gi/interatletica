@@ -49,7 +49,7 @@ export function Boasvindas() {
         <Passo
           numero="1"
           titulo="Crie o evento"
-          texto="Campeonato, jogo, treino ou reunião. Nasce como rascunho — nada fica visível até você publicar."
+          texto="Campeonato, jogo, treino ou reunião. Nasce como rascunho. Nada fica visível até você publicar."
         />
         <Passo
           numero="2"
@@ -66,7 +66,7 @@ export function Boasvindas() {
       <section className="cartao">
         <h3>Já é de uma atlética?</h3>
         <p className="fraco">
-          A entrada é por convite da diretoria — não existe cadastro aberto, e
+          A entrada é por convite da diretoria. Não existe cadastro aberto, e
           é assim de propósito: sem essa porta fechada, moderar cadastro falso
           vira trabalho de alguém já na primeira semana.
         </p>

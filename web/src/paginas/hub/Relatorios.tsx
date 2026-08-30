@@ -66,7 +66,7 @@ export function Relatorios() {
                 <p className="fraco" style={{ marginTop: '0.8rem', marginBottom: 0 }}>
                   Quem confirma e não vai ocupa uma vaga que ficaria com alguém
                   da lista de espera. É o número que justifica abrir mais vagas
-                  do que a capacidade — ou não.
+                  do que a capacidade, ou não.
                 </p>
               </section>
 

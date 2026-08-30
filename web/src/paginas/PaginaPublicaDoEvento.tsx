@@ -172,7 +172,7 @@ function BlocoDeInscricao({ evento }: { evento: EventoPublico }) {
         {evento.vagasRestantes !== null ? (
           <span className={`etiqueta ${lotado ? 'etiqueta--alerta' : 'etiqueta--sucesso'}`}>
             {lotado
-              ? 'Lotado — entra na espera'
+              ? 'Só lista de espera'
               : `${evento.vagasRestantes} vaga${evento.vagasRestantes === 1 ? '' : 's'}`}
           </span>
         ) : null}

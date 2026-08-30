@@ -198,7 +198,7 @@ function LinkPublico({ link }: { link: string }) {
 
   return (
     <section className="cartao">
-      <div className="fraco">Link público — cole no grupo</div>
+      <div className="fraco">Link público, para colar no grupo</div>
       <div className="linha entre">
         <code style={{ wordBreak: 'break-all' }}>{link}</code>
         <button className="botao botao--discreto botao--pequeno"
@@ -301,8 +301,8 @@ function ListaDePresenca({ slug, eventoId }: { slug: string; eventoId: string })
                 <tbody>
                   {visiveis.slice(0, 200).map((p) => (
                     <tr key={p.inscricaoId}>
-                      <td>{p.nome ?? '—'}</td>
-                      <td className="fraco">{p.email ?? '—'}</td>
+                      <td>{p.nome ?? 'sem nome'}</td>
+                      <td className="fraco">{p.email ?? 'não informado'}</td>
                       <td>
                         {p.atleticaDeOrigem
                           ? <span className="etiqueta">{nomeDaOrigem(p.atleticaDeOrigem)}</span>
@@ -322,7 +322,7 @@ function ListaDePresenca({ slug, eventoId }: { slug: string; eventoId: string })
                           ? <span className="etiqueta etiqueta--sucesso">
                               {hora(p.checkinEm)}
                             </span>
-                          : <span className="fraco">—</span>}
+                          : <span className="fraco">não entrou</span>}
                       </td>
                     </tr>
                   ))}

@@ -157,7 +157,7 @@ function FormularioDeConvite({ slug, aoConvidar }: {
       <h3>Convidar</h3>
       <p className="fraco">
         O convite é endereçado a este e-mail. Só quem entrar com ele consegue
-        aceitar — é o que impede um link encaminhado no grupo de matricular o
+        aceitar. É o que impede um link encaminhado no grupo de matricular o
         grupo inteiro.
       </p>
 

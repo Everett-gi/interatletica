@@ -68,7 +68,7 @@ export function MeuPerfil() {
         </div>
         {perfil.atleticas.length === 0 ? (
           <Vazio titulo="Você ainda não faz parte de uma atlética">
-            Peça um convite à diretoria da sua. É a única forma de entrar — e é
+            Peça um convite à diretoria da sua. É a única forma de entrar, e é
             assim de propósito.
           </Vazio>
         ) : (

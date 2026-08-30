@@ -34,15 +34,15 @@ const SO_HORA = new Intl.DateTimeFormat(LOCAL, {
 })
 
 export function dataEHora(iso: string | null): string {
-  return iso ? DATA_E_HORA.format(new Date(iso)) : '—'
+  return iso ? DATA_E_HORA.format(new Date(iso)) : 'sem data'
 }
 
 export function dataPorExtenso(iso: string | null): string {
-  return iso ? DATA_COMPLETA.format(new Date(iso)) : '—'
+  return iso ? DATA_COMPLETA.format(new Date(iso)) : 'sem data'
 }
 
 export function hora(iso: string | null): string {
-  return iso ? SO_HORA.format(new Date(iso)) : '—'
+  return iso ? SO_HORA.format(new Date(iso)) : 'sem horário'
 }
 
 /**

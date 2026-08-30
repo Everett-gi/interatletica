@@ -41,7 +41,7 @@ export function Equipes() {
           <h1>Equipes</h1>
           <p className="fraco" style={{ margin: 0 }}>
             O elenco por modalidade. A equipe é da atlética e atravessa os
-            eventos — ela se inscreve, não é criada por evento.
+            eventos. Ela se inscreve, não é criada por evento.
           </p>
         </div>
         {diretor ? (

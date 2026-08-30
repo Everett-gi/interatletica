@@ -125,7 +125,7 @@ export function Painel() {
                 <section className="cartao">
                   <h3>De onde vieram</h3>
                   <p className="fraco">
-                    A atlética de origem de cada inscrito — o número que só um
+                    A atlética de origem de cada inscrito, o número que só um
                     interatlética responde.
                   </p>
                   <Barras
