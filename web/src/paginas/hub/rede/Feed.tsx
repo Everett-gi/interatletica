@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { PostDaRede, TipoDePostDaRede } from '../../../api/tipos-conhecimento'
 import { Avatar, Brasao, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
-import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
+import { CabecalhoDePagina, Chips, Confirmacao, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../../ui/icones'
 import { quando } from '../../../formatos'
 
@@ -31,6 +31,8 @@ type Filtro = 'TUDO' | TipoDePostDaRede
 export function Feed() {
   const { slug = '' } = useParams()
   const [filtro, setFiltro] = useState<Filtro>('TUDO')
+  const [denunciando, setDenunciando] = useState<PostDaRede | null>(null)
+  const [denunciados, setDenunciados] = useState<string[]>([])
   const posts = useBusca<PostDaRede[]>(() => Dados.feedDaRede(), [])
 
   return (
@@ -139,6 +141,17 @@ export function Feed() {
                               {post.respostas} respostas
                             </span>
                           ) : null}
+                          {/* Denúncia discreta (§93): precisa existir em todo
+                              conteúdo da rede, e não pode competir com a ação
+                              principal do card. */}
+                          <button
+                            className="botao botao--fantasma botao--pequeno"
+                            style={{ minHeight: 'auto', padding: '0 0.3rem',
+                                     fontSize: '0.78rem' }}
+                            onClick={() => setDenunciando(post)}
+                          >
+                            <Icone nome="alerta" tamanho={13} /> Denunciar
+                          </button>
                         </div>
 
                         {post.destino ? (
@@ -170,6 +183,32 @@ export function Feed() {
                   </div>
                 </div>
               </div>
+
+              {denunciando ? (
+                <Confirmacao
+                  titulo="Denunciar esta publicação?"
+                  consequencia={
+                    `“${denunciando.titulo}”, publicada pela ${denunciando.atletica.nome}, `
+                    + 'vai para a administração da rede com o nome da sua atlética. '
+                    + 'A publicação não é removida agora — quem modera analisa antes. '
+                    + 'Toda ação administrativa fica registrada no histórico.'
+                  }
+                  rotuloDeConfirmar="Enviar denúncia"
+                  aoConfirmar={() => {
+                    setDenunciados((atuais) => [...atuais, denunciando.id])
+                    setDenunciando(null)
+                  }}
+                  aoCancelar={() => setDenunciando(null)}
+                />
+              ) : null}
+
+              {denunciados.length > 0 ? (
+                <div className="aviso aviso--sucesso" style={{ marginTop: '1rem' }}>
+                  {denunciados.length === 1
+                    ? 'Denúncia enviada à administração da rede.'
+                    : `${denunciados.length} denúncias enviadas à administração da rede.`}
+                </div>
+              ) : null}
             </>
           )
         }}

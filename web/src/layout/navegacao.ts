@@ -53,6 +53,7 @@ export const NAVEGACAO: GrupoDeNavegacao[] = [
       { para: 'gestao', rotulo: 'Gestão', icone: 'gestao' },
       { para: 'documentos', rotulo: 'Documentos', icone: 'documentos' },
       { para: 'patrimonio', rotulo: 'Patrimônio', icone: 'patrimonio', exige: 'DIRETOR' },
+      { para: 'relatorios', rotulo: 'Indicadores', icone: 'resultados', exige: 'DIRETOR' },
     ],
   },
   {
