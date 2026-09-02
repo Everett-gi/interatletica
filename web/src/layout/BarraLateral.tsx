@@ -93,6 +93,11 @@ export function BarraLateral({
       </div>
 
       <div className="lateral__rodape">
+        <NavLink to={`${base}/boas-vindas`} className="lateral__item" onClick={aoFechar}
+                 title={recolhida ? 'Primeiros passos' : undefined}>
+          <Icone nome="certo" tamanho={18} />
+          <span className="lateral__rotulo">Primeiros passos</span>
+        </NavLink>
         <NavLink to="/ajuda" className="lateral__item" onClick={aoFechar}
                  title={recolhida ? 'Ajuda' : undefined}>
           <Icone nome="info" tamanho={18} />
