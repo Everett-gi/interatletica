@@ -154,6 +154,41 @@ Três decisões que valem registro:
 - **O painel muda com a função.** O tesoureiro abre no caixa, o diretor de esportes abre nos jogos, o membro abre no que pode fazer. A função vem do cargo que a própria atlética escreveu, com o papel como rede de segurança — impor uma lista fechada de cargos quebraria toda atlética que se organiza de outro jeito.
 - **Item sem permissão não aparece.** Mostrar e negar no clique é pior que não mostrar, porque promete uma coisa que não vai acontecer.
 
+### A entrada
+
+Três telas: `/entrar`, `/criar-conta` e `/criar-atletica`.
+
+A autenticação real é **OAuth do Google, e só ela** — o servidor não guarda senha, não tem fluxo de recuperação e não quer ter. Uma plataforma mantida por uma diretoria que muda todo ano não deveria ser responsável por guardar senha de estudante. Por isso `/criar-conta` não é um formulário de cadastro: é a explicação do que acontece no primeiro login e, sobretudo, do que vem **depois** dele — ou você cria a sua atlética, ou espera um convite. Não há terceira saída.
+
+No modo demonstração o Google não existe, então as duas telas oferecem um atalho que cria uma sessão local. A tela diz isso em voz alta; fingir um login funcionando seria mentir sobre o produto.
+
+`/criar-atletica` são quatro perguntas curtas — nome, instituição, cidade, cor —, com prévia do brasão ao lado. Diretoria, esportes, primeiro projeto e convites **não** entram aí: viram a lista de primeiros passos depois que a atlética existe, porque são coisas que se fazem no módulo delas e não num cadastro paralelo que depois precisaria ser refeito no lugar certo.
+
+### Começar do zero, ou ver cheio
+
+A demonstração abre **deslogada**, com dois caminhos explícitos:
+
+- **Começar do zero** — conta nova, atlética nova, tudo vazio. É o caminho de quem vai *usar*.
+- **Abrir a demonstração preenchida** — entra como presidente de uma atlética fictícia com dois anos de história. É o caminho de quem vai *apresentar*.
+
+O que **não** fica vazio no caminho do zero é a rede: guias, modelos, fornecedores avaliados, comunidades e as outras atléticas existem independentemente de você — e é justamente isso que dá o que fazer no primeiro dia. Uma atlética vazia numa rede vazia não demonstraria nada.
+
+Criar a conta zera o que é *pessoal* no estado compartilhado: comunidade em que participo, parceria e amistoso em que demonstrei interesse, compra em que entrei, voto que dei. Sem isso, o checklist de primeiros passos nasceria com item marcado sozinho — a plataforma afirmando que a pessoa fez coisas que ela não fez.
+
+Pelo mesmo motivo, conquistas, indicadores e o checklist são **derivados** do que a atlética realmente tem, e não constantes. Antes eram constantes, e uma atlética criada há dois minutos exibia "primeiro campeonato — há 280 dias" e 74% de presença sem ter tido um evento.
+
+### O tutorial
+
+Duas camadas, e nenhuma delas é um manual.
+
+**Ajuda contextual por tela.** Cada módulo tem um registro em `ui/tutorial.ts` com o que ele é, dois a quatro passos de como usar e — quando não é evidente — o porquê de existir. Aparece aberta na primeira visita a cada tela e depois encolhe para uma linha que reabre num clique. Nunca some de vez: seis meses depois é outra diretoria olhando a mesma tela pela primeira vez.
+
+As quarenta explicações ficam num arquivo só de propósito. Escritas dentro de cada componente, seriam a primeira coisa a envelhecer e a última que alguém revisa; lado a lado, fica óbvio quando uma está vaga demais ou repetindo a outra. A regra de escrita é dizer o porquê, não o óbvio: *"aqui você gerencia seus documentos"* não ensina nada; *"guardar o contrato na hora em que ele é assinado é o que evita procurá-lo um ano depois"* ensina.
+
+**Tour de primeiro acesso.** Cinco paradas que ensinam a *navegar* — os grupos, o seletor de atlética, a pesquisa, a ajuda de cada tela —, com destaque desenhado sobre a posição real do elemento. Nenhuma delas explica um módulo: isso é papel da ajuda contextual, que aparece onde a pergunta nasce. Tour que tenta explicar quarenta telas de uma vez é tour que se pula.
+
+As duas podem ser reativadas na central de ajuda, que é o que se faz quando entra gente nova na diretoria.
+
 ### Os módulos conversam
 
 Um campeonato criado aparece no calendário, no painel, nos eventos, nas tarefas e no financeiro — sem ninguém cadastrar duas vezes. O saldo, o orçamento realizado e o gráfico de evolução são **derivados dos lançamentos**, e não totais guardados à parte que desandam na primeira correção. A tabela de classificação sai das partidas encerradas: corrigir um placar reordena a tabela sozinho.

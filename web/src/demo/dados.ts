@@ -131,6 +131,21 @@ export function atleticaPorSlug(slug: string): AtleticaResumo | undefined {
   return ATLETICAS.find((a) => a.slug === slug)
 }
 
+/**
+ * Acrescenta uma atlética criada durante a visita à lista da rede.
+ *
+ * <p>Empurra no mesmo array em vez de manter uma lista paralela, e isso é
+ * deliberado: `atleticaPorSlug` é consultada de dez lugares — busca global,
+ * feed, participantes de torneio, origem dos inscritos. Uma segunda lista
+ * faria a atlética recém-criada existir no hub e não existir na rede, que é
+ * exatamente o tipo de incoerência que denuncia maquete.</p>
+ */
+export function registrarAtletica(atletica: AtleticaResumo): void {
+  if (!ATLETICAS.some((a) => a.slug === atletica.slug)) {
+    ATLETICAS.push(atletica)
+  }
+}
+
 // ---------------------------------------------------------------------
 // Pessoas
 // ---------------------------------------------------------------------

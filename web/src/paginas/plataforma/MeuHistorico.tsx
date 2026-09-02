@@ -41,9 +41,12 @@ export function MeuHistorico() {
 
   const busca = useBusca<Composicao>(async () => {
     if (!perfil) return { inscricoes: [], equipes: [], conquistas: [] }
+    // As conquistas são da atlética, não da pessoa. Aqui aparecem as do
+    // primeiro vínculo — que é onde a participação de quem está lendo pesa.
+    const principal = perfil.atleticas[0]?.atletica.slug
     const [inscricoes, conquistas] = await Promise.all([
       Dados.minhasInscricoes(),
-      Dados.conquistas(),
+      principal ? Dados.conquistas(principal) : Promise.resolve([]),
     ])
     const listas = await Promise.all(
       perfil.atleticas.map((v) => Dados.equipes(v.atletica.slug)))

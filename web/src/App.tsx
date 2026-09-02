@@ -13,6 +13,9 @@ import { AtleticaPublica } from './paginas/AtleticaPublica'
 import { PaginaPublicaDoEvento } from './paginas/PaginaPublicaDoEvento'
 import { Convite } from './paginas/Convite'
 import { MeuPerfil } from './paginas/MeuPerfil'
+import { Entrar } from './paginas/entrada/Entrar'
+import { CriarConta } from './paginas/entrada/CriarConta'
+import { CriarAtletica } from './paginas/entrada/CriarAtletica'
 import { Portaria } from './paginas/hub/Portaria'
 
 // Da pessoa e da plataforma, fora do contexto de uma atlética.
@@ -79,6 +82,9 @@ export function App() {
       {/* O público e o que não pertence a uma atlética só. */}
       <Route element={<LayoutPublico />}>
         <Route path="/" element={<PortaDeEntrada />} />
+        <Route path="/entrar" element={<Entrar />} />
+        <Route path="/criar-conta" element={<CriarConta />} />
+        <Route path="/criar-atletica" element={<CriarAtletica />} />
         <Route path="/rede" element={<Rede />} />
         <Route path="/rede/quadro" element={<QuadroDeMedalhas />} />
         <Route path="/a/:slug" element={<AtleticaPublica />} />
@@ -109,8 +115,12 @@ function LayoutPublico() {
 }
 
 /**
- * Quem tem vínculo cai direto na própria atlética. Quem não tem vê o que a
- * plataforma é.
+ * Três estados, três destinos.
+ *
+ * <p>Quem tem vínculo cai direto na própria atlética. Quem tem conta e
+ * nenhuma atlética vai criar a sua — é o único passo que falta, e deixá-lo
+ * numa tela de boas-vindas genérica seria esconder a saída. Quem não tem
+ * conta vê o que a plataforma é.</p>
  *
  * <p>A versão anterior abria num feed de eventos de todas as atléticas.
  * Ficava bonito e respondia a pergunta errada: quem entra aqui quer
@@ -125,6 +135,9 @@ function PortaDeEntrada() {
   if (perfil && perfil.atleticas.length > 0) {
     return <Navigate to={`/hub/${perfil.atleticas[0].atletica.slug}`} replace />
   }
+  if (perfil) {
+    return <Navigate to="/criar-atletica" replace />
+  }
   return <Boasvindas />
 }
 
@@ -137,7 +150,7 @@ function FaixaDeDemonstracao() {
 }
 
 function Topo() {
-  const { perfil, carregando, aparencia, trocarAparencia, assumirPapel } = useSessao()
+  const { perfil, carregando, aparencia, trocarAparencia } = useSessao()
 
   return (
     <header className="topo">
@@ -172,15 +185,8 @@ function Topo() {
               {perfil.nome.split(' ')[0]}
             </NavLink>
           </>
-        ) : MODO_DEMO ? (
-          <button className="botao botao--pequeno"
-                  onClick={() => void assumirPapel('PRESIDENTE')}>
-            Entrar
-          </button>
         ) : (
-          <a className="botao botao--pequeno" href="/oauth2/authorization/google">
-            Entrar
-          </a>
+          <Link to="/entrar" className="botao botao--pequeno">Entrar</Link>
         )}
       </div>
     </header>

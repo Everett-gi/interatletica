@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
-import { Dados, MODO_DEMO } from '../dados'
+import { Dados } from '../dados'
 import type { Decisao } from '../api/tipos-gestao'
 import type { Tarefa } from '../api/tipos-rede'
 import type { PedidoDeAjuda } from '../api/tipos-conhecimento'
 import { useSessao } from '../sessao/SessaoContexto'
 import { Carregando } from '../ui/componentes'
+import { ComoFunciona } from '../ui/ComoFunciona'
 import { useCorDaAtletica } from '../ui/useCorDaAtletica'
 import { BarraLateral } from './BarraLateral'
 import { BarraDoTopo } from './BarraDoTopo'
+import { TourInicial, tourJaVisto } from './TourInicial'
 import type { ContagensDaNavegacao } from './navegacao'
 
 const CHAVE_RECOLHIDA = 'interatletica:lateral-recolhida'
@@ -55,11 +57,31 @@ export function Aparelho() {
 
   const contagens = useContagens(slug, meu !== null)
 
+  // O caminho dentro do hub, que é a chave da ajuda contextual.
+  const caminhoRelativo = local.pathname
+    .replace(new RegExp(`^/hub/${slug}/?`), '')
+    .replace(/\/+$/, '')
+
+  // O tour só faz sentido depois que a casca existe — e uma vez só.
+  const [mostrarTour, setMostrarTour] = useState(false)
+  useEffect(() => {
+    if (perfil && meu && !tourJaVisto()) {
+      // Espera a primeira pintura: o tour mede a posição real dos elementos,
+      // e medir antes de a barra lateral existir aponta para o vazio.
+      const relogio = setTimeout(() => setMostrarTour(true), 700)
+      return () => clearTimeout(relogio)
+    }
+    return undefined
+  }, [perfil, meu])
+
   if (carregando) {
     return <Carregando rotulo="Abrindo sua atlética" />
   }
-  if (!perfil || !meu) {
-    return <SemVinculo slug={slug} temSessao={perfil !== null} />
+  if (!perfil) {
+    return <SemSessao slug={slug} />
+  }
+  if (!meu) {
+    return <SemVinculo slug={slug} temAtleticas={perfil.atleticas.length > 0} />
   }
 
   return (
@@ -85,9 +107,16 @@ export function Aparelho() {
       <div className="app__area">
         <BarraDoTopo slug={slug} aoAbrirMenu={() => setGavetaAberta(true)} />
         <main className="app__conteudo">
+          {/* A ajuda vem antes do título porque é aí que a pergunta "o que é
+              isto?" existe. Depois de dispensada vira uma linha fina. */}
+          <ComoFunciona caminho={caminhoRelativo} />
           <Outlet />
         </main>
       </div>
+
+      {mostrarTour ? (
+        <TourInicial aoEncerrar={() => setMostrarTour(false)} />
+      ) : null}
     </div>
   )
 }
@@ -132,24 +161,52 @@ function useContagens(slug: string, ativo: boolean): ContagensDaNavegacao {
   return contagens
 }
 
-/** Quem chega no hub de uma atlética sem vínculo. */
-function SemVinculo({ slug, temSessao }: { slug: string; temSessao: boolean }) {
-  const { assumirPapel } = useSessao()
-
+/** Quem chega no hub sem estar logado. */
+function SemSessao({ slug }: { slug: string }) {
   return (
     <div className="cartao" style={{ maxWidth: '32rem', margin: '3rem auto' }}>
       <h1>Área da diretoria</h1>
       <p className="suave">
-        {temSessao
-          ? 'Você não tem vínculo com esta atlética. A entrada é por convite da diretoria.'
-          : 'Entre para acessar a área da sua atlética.'}
+        Esta parte é de quem tem vínculo com a atlética. Entre para continuar —
+        ou veja a página pública, que é aberta a qualquer pessoa.
       </p>
       <div className="linha">
-        {MODO_DEMO && !temSessao ? (
-          <button className="botao" onClick={() => void assumirPapel('PRESIDENTE')}>
-            Entrar na demonstração
-          </button>
-        ) : null}
+        <Link className="botao" to="/entrar">Entrar</Link>
+        <Link className="botao botao--discreto" to={`/a/${slug}`}>
+          Ver a página pública
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Quem está logado mas não pertence a esta atlética.
+ *
+ * <p>Duas situações diferentes, e a saída certa muda: quem não tem atlética
+ * nenhuma precisa criar a sua; quem já tem outras entrou no endereço errado e
+ * precisa voltar para as suas.</p>
+ */
+function SemVinculo({ slug, temAtleticas }: { slug: string; temAtleticas: boolean }) {
+  const { perfil } = useSessao()
+
+  return (
+    <div className="cartao" style={{ maxWidth: '32rem', margin: '3rem auto' }}>
+      <h1>Você não faz parte desta atlética</h1>
+      <p className="suave">
+        A entrada é por convite da diretoria, endereçado ao seu e-mail. Não
+        existe cadastro aberto de vínculo, e é assim de propósito.
+      </p>
+      <div className="linha">
+        {temAtleticas && perfil ? (
+          <Link className="botao" to={`/hub/${perfil.atleticas[0].atletica.slug}`}>
+            Ir para a minha atlética
+          </Link>
+        ) : (
+          <Link className="botao" to="/criar-atletica">
+            Criar a minha atlética
+          </Link>
+        )}
         <Link className="botao botao--discreto" to={`/a/${slug}`}>
           Ver a página pública
         </Link>

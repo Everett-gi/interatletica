@@ -22,7 +22,7 @@ import { useSessao } from '../sessao/SessaoContexto'
  * tenant explicitamente suspenso.</p>
  */
 export function MeuPerfil() {
-  const { perfil, carregando, assumirPapel } = useSessao()
+  const { perfil, carregando } = useSessao()
   const inscricoes = useBusca<Inscricao[]>(
     () => (perfil ? Dados.minhasInscricoes() : Promise.resolve([])),
     [perfil?.id],
@@ -36,13 +36,7 @@ export function MeuPerfil() {
     return (
       <Vazio titulo="Você não está conectado">
         <p>Entre para ver seus vínculos e inscrições.</p>
-        {MODO_DEMO ? (
-          <button className="botao" onClick={() => void assumirPapel('PRESIDENTE')}>
-            Entrar na demonstração
-          </button>
-        ) : (
-          <a className="botao" href="/oauth2/authorization/google">Entrar com Google</a>
-        )}
+        <Link className="botao" to="/entrar">Entrar</Link>
       </Vazio>
     )
   }

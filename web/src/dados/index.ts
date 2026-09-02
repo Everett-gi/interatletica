@@ -36,6 +36,17 @@ export const Dados = {
   sairDemo: () => lojaDemo.sair(),
   assumirPapel: lojaDemo.assumirPapel,
 
+  // Cadastro e criação de atlética. Só existem na demonstração: com a API
+  // conectada, a conta nasce do OAuth e a atlética é criada por um operador
+  // — `POST /api/atleticas`, que devolve o convite do primeiro presidente.
+  cadastrarDemo: (nome: string, email: string) => {
+    // Conta nova começa sem participação nenhuma na rede. O conteúdo dela
+    // continua lá; o que zera é o que eu já teria feito.
+    lojaDosModulos.zerarEstadoPessoal()
+    return lojaDemo.cadastrar(nome, email)
+  },
+  criarAtleticaDemo: lojaDemo.criarAtletica,
+
   // ---------------- Rede ----------------
   vitrine: () => (MODO_DEMO ? lojaDemo.vitrine() : Api.vitrine()),
   agendaDaRede: lojaDemo.agendaDaRede,

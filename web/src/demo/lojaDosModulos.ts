@@ -66,6 +66,7 @@ import type {
 } from '../api/tipos-plataforma'
 
 import { ATLETICAS, EVENTOS, MEMBROS, atleticaPorSlug } from './dados'
+import { estadoDaDemonstracao } from './loja'
 import {
   DECISOES,
   DOCUMENTOS,
@@ -229,16 +230,20 @@ function resumirFinanceiro(slug: string): ResumoFinanceiro {
     })
     .sort((a, b) => (b.receita + b.despesa) - (a.receita + a.despesa))
 
-  const orcamento = (Object.keys(ORCAMENTO_PREVISTO) as CategoriaFinanceira[])
-    .map((categoria) => {
-      const daCategoria = confirmados.filter((l) => l.categoria === categoria)
-      return {
-        categoria,
-        previsto: ORCAMENTO_PREVISTO[categoria],
-        realizado: daCategoria.reduce((s, l) => s + l.valor, 0),
-      }
-    })
-    .filter((linha) => linha.previsto > 0)
+  // Sem lançamento nenhum não existe orçamento aprovado — e mostrar as onze
+  // rubricas com 0% realizado faria uma atlética recém-criada parecer que
+  // aprovou R$ 126 mil em assembleia.
+  const orcamento = lancamentos.length === 0 ? [] :
+    (Object.keys(ORCAMENTO_PREVISTO) as CategoriaFinanceira[])
+      .map((categoria) => {
+        const daCategoria = confirmados.filter((l) => l.categoria === categoria)
+        return {
+          categoria,
+          previsto: ORCAMENTO_PREVISTO[categoria],
+          realizado: daCategoria.reduce((s, l) => s + l.valor, 0),
+        }
+      })
+      .filter((linha) => linha.previsto > 0)
 
   return {
     saldoAtual: receitas - despesas,
@@ -362,6 +367,34 @@ const PAGINAS = [
 // =====================================================================
 
 export const lojaDosModulos = {
+  /**
+   * Apaga o que é "meu" no estado compartilhado da rede.
+   *
+   * <p>Comunidade em que participo, parceria e amistoso em que demonstrei
+   * interesse, compra em que entrei, voto que dei: tudo isso vem marcado no
+   * seed porque a demonstração preenchida representa uma atlética com
+   * história. Numa conta recém-criada, esses marcadores seriam a plataforma
+   * afirmando que a pessoa fez coisas que ela não fez — e o checklist de
+   * primeiros passos já nasceria com item marcado sozinho.</p>
+   *
+   * <p>O conteúdo da rede continua: as comunidades, as parcerias e as compras
+   * seguem existindo, e é isso que dá o que fazer no primeiro dia. O que zera
+   * é a minha participação nelas.</p>
+   */
+  zerarEstadoPessoal(): void {
+    estado.comunidades.forEach((c) => {
+      if (c.participo) {
+        c.participo = false
+        c.membros = Math.max(0, c.membros - 1)
+      }
+    })
+    estado.parcerias.forEach((p) => { p.tenhoInteresse = false })
+    estado.amistosos.forEach((a) => { a.tenhoInteresse = false })
+    estado.compras.forEach((c) => { c.participo = false })
+    estado.decisoes.forEach((d) => { d.meuVoto = null })
+    estado.notificacoes.forEach((n) => { n.lida = false })
+  },
+
   // ---------------- Gestão ----------------
   projetos: (slug: string): Promise<Projeto[]> =>
     responder(daAtletica(estado.projetos, slug)),
@@ -642,7 +675,18 @@ export const lojaDosModulos = {
   midias: (slug: string): Promise<Midia[]> => responder(daAtletica(MIDIAS, slug)),
 
   // ---------------- Plataforma ----------------
-  notificacoes: (): Promise<Notificacao[]> => responder(estado.notificacoes, 90),
+  /**
+   * As notificações que dizem respeito a esta atlética.
+   *
+   * <p>As de `atleticaSlug` nulo são da rede e valem para todo mundo — é o
+   * que faz uma atlética recém-criada ter o que ver aqui sem inventar
+   * pendência que ela não tem.</p>
+   */
+  notificacoes: (slug: string): Promise<Notificacao[]> =>
+    responder(
+      estado.notificacoes.filter(
+        (n) => n.atleticaSlug === null || n.atleticaSlug === slug),
+      90),
 
   marcarNotificacaoLida(id: string): Promise<Notificacao[]> {
     const alvo = estado.notificacoes.find((n) => n.id === id)
@@ -668,9 +712,117 @@ export const lojaDosModulos = {
     return responder(achados, 70)
   },
 
-  conquistas: (): Promise<Conquista[]> => responder(CONQUISTAS),
-  indicadores: (): Promise<Indicador[]> => responder(INDICADORES),
+  /**
+   * As conquistas da atlética, derivadas do que ela realmente fez.
+   *
+   * <p>Eram constantes com data cravada. Para a atlética de exemplo isso
+   * passava; para uma atlética criada há dois minutos, a tela dizia
+   * "primeiro campeonato — há 280 dias". Marco que não aconteceu não pode
+   * aparecer como alcançado.</p>
+   */
+  conquistas(slug: string): Promise<Conquista[]> {
+    const eventos = estadoDaDemonstracao.resumoDeEventos(slug)
+    const projetos = daAtletica(estado.projetos, slug)
+    const prestacoes = daAtletica(estado.prestacoes, slug)
+    const torneios = estadoDaDemonstracao.torneiosDe(slug)
+    const social = projetos.filter((p) => p.tipo === 'SOCIAL' && p.status === 'CONCLUIDO')
+    const contribuiu = EXPERIENCIAS.some((e) => e.atletica.slug === slug)
+      || GUIAS.some((g) => g.autorAtletica?.slug === slug)
+    const transicao = estado.transicao.atleticaSlug === slug
+      && estado.transicao.itens.every((i) => i.concluido)
+    const mentora = MENTORIAS.some((m) => m.atletica.slug === slug)
+
+    const alcancada: Record<string, boolean> = {
+      'cq-01': eventos.total > 0,
+      'cq-02': torneios.length > 0,
+      'cq-03': PARCERIAS.some(
+        (p) => p.proponente?.slug === slug || p.interessadas.some((a) => a.slug === slug)),
+      'cq-04': social.length > 0,
+      'cq-05': contribuiu,
+      'cq-06': prestacoes.filter((p) => p.publicada).length >= 3,
+      'cq-07': transicao,
+      'cq-08': mentora,
+    }
+
+    return responder(CONQUISTAS.map((c) => ({
+      ...c,
+      conquistadaEm: alcancada[c.id] ? c.conquistadaEm : null,
+    })))
+  },
+
+  /**
+   * Os indicadores da atlética contra a média da rede.
+   *
+   * <p>O valor vem do estado; a média continua constante, porque ela
+   * representa a rede inteira e não é calculável a partir de seis atléticas
+   * de exemplo. Quando o valor é zero, a variação some: "+16% de nada" não
+   * quer dizer coisa alguma.</p>
+   */
+  indicadores(slug: string): Promise<Indicador[]> {
+    const eventos = estadoDaDemonstracao.resumoDeEventos(slug)
+    const membros = estadoDaDemonstracao.membrosDe(slug)
+      .filter((m) => m.situacao === 'ATIVO').length
+    const equipes = estadoDaDemonstracao.equipesDe(slug).length
+    const projetos = daAtletica(estado.projetos, slug)
+    const receita = daAtletica(estado.lancamentos, slug)
+      .filter((l) => l.natureza === 'RECEITA' && l.situacao === 'CONFIRMADO')
+      .reduce((s, l) => s + l.valor, 0)
+    const patrocinios = daAtletica(estado.patrocinios, slug)
+      .filter((p) => p.etapa === 'ATIVO').length
+    const contribuicoes = EXPERIENCIAS.filter((e) => e.atletica.slug === slug).length
+      + GUIAS.filter((g) => g.autorAtletica?.slug === slug).length
+
+    const valores: Record<string, number> = {
+      'Membros ativos': membros,
+      'Eventos no ano': eventos.total,
+      'Participação média por evento': eventos.publicados === 0
+        ? 0 : Math.round(eventos.inscritos / eventos.publicados),
+      'Taxa de presença': eventos.inscritos === 0
+        ? 0 : Math.round((eventos.presentes / eventos.inscritos) * 100),
+      'Projetos concluídos': projetos.filter((p) => p.status === 'CONCLUIDO').length,
+      'Receita no ano': receita,
+      'Patrocinadores ativos': patrocinios,
+      'Equipes ativas': equipes,
+      'Ações sociais': projetos.filter(
+        (p) => p.tipo === 'SOCIAL' && p.status === 'CONCLUIDO').length,
+      'Contribuições à base de conhecimento': contribuicoes,
+    }
+
+    return responder(INDICADORES.map((ind) => {
+      const valor = valores[ind.rotulo] ?? ind.valor
+      return { ...ind, valor, variacao: valor === 0 ? null : ind.variacao }
+    }))
+  },
+
   ranking: (tipo: TipoDeRanking): Promise<LinhaDeRanking[]> => responder(RANKINGS[tipo]),
   painelDaRede: (): Promise<PainelDaRede> => responder(PAINEL_DA_REDE),
-  onboarding: (): Promise<PassoDeOnboarding[]> => responder(estado.onboarding),
+
+  /**
+   * Os primeiros passos, marcados pelo que já existe de verdade.
+   *
+   * <p>Checklist que vem pré-marcado não é checklist: é decoração. Aqui cada
+   * passo consulta o módulo correspondente, então marcar o item depende de
+   * fazer a coisa.</p>
+   */
+  onboarding(slug: string): Promise<PassoDeOnboarding[]> {
+    const membros = estadoDaDemonstracao.membrosDe(slug)
+    const eventos = estadoDaDemonstracao.resumoDeEventos(slug)
+    const atletica = ATLETICAS.find((a) => a.slug === slug)
+
+    const feito: Record<string, boolean> = {
+      'ob-01': Boolean(atletica?.cidade && atletica?.instituicao),
+      'ob-02': membros.filter((m) => m.papel !== 'MEMBRO').length > 1,
+      'ob-03': membros.length > 1,
+      'ob-04': daAtletica(estado.metas, slug).length > 0,
+      'ob-05': estadoDaDemonstracao.equipesDe(slug).length > 0,
+      'ob-06': daAtletica(estado.projetos, slug).length > 0,
+      'ob-07': eventos.publicados > 0,
+      'ob-08': estado.comunidades.some((c) => c.participo),
+      'ob-09': daAtletica(estado.prestacoes, slug).length > 0,
+      'ob-10': EXPERIENCIAS.some((e) => e.atletica.slug === slug),
+    }
+
+    return responder(estado.onboarding.map(
+      (p) => ({ ...p, concluido: feito[p.id] ?? p.concluido })))
+  },
 }

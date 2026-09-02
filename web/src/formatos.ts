@@ -142,8 +142,19 @@ export function variacao(percentual: number): string {
   return `${sinal}${Math.abs(percentual)}%`
 }
 
-/** "68%" a partir de uma proporção de 0 a 1, presa nos limites. */
+/**
+ * "68%" a partir de uma proporção de 0 a 1, presa nos limites.
+ *
+ * <p>Divisão por zero vira 0%, e não "NaN%". Acontece de verdade: uma
+ * atlética recém-criada tem orçamento zero, e `realizado / previsto` é
+ * `NaN`. Tratar aqui protege todos os chamadores de uma vez — cada tela
+ * checar o denominador antes de formatar seria a mesma correção repetida
+ * vinte vezes, e uma delas ficaria para trás.</p>
+ */
 export function percentual(proporcao: number): string {
+  if (!Number.isFinite(proporcao)) {
+    return '0%'
+  }
   return `${Math.round(Math.min(1, Math.max(0, proporcao)) * 100)}%`
 }
 

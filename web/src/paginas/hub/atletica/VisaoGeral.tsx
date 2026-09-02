@@ -66,7 +66,7 @@ export function VisaoGeral() {
       Dados.patrocinios(slug),
       Dados.gestoes(slug),
       Dados.historico(),
-      Dados.conquistas(),
+      Dados.conquistas(slug),
     ])
     return { painel, membros, equipes, projetos, metas, financeiro,
              patrocinios, gestoes, historico, conquistas }

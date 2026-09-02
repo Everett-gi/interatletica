@@ -1,8 +1,9 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { ResumoFinanceiro } from '../../../api/tipos-financeiro'
 import { Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
-import { CabecalhoDePagina, Progresso, Secao } from '../../../ui/pagina'
+import { CabecalhoDePagina, EstadoVazio, Progresso, Secao } from '../../../ui/pagina'
+import { Icone } from '../../../ui/icones'
 import { dinheiro, percentual } from '../../../formatos'
 import { CATEGORIA } from './Financeiro'
 
@@ -34,6 +35,21 @@ export function Orcamento() {
           const previsto = r.orcamento.reduce((s, l) => s + l.previsto, 0)
           const realizado = r.orcamento.reduce((s, l) => s + l.realizado, 0)
           const estourados = r.orcamento.filter((l) => l.realizado > l.previsto)
+
+          if (r.orcamento.length === 0) {
+            return (
+              <EstadoVazio icone="orcamento" titulo="Nenhum orçamento aprovado">
+                <p className="fraco">
+                  O orçamento aparece quando houver movimento no caixa. Comece
+                  registrando as receitas e despesas do ano — o previsto contra
+                  o realizado só faz sentido quando existe realizado.
+                </p>
+                <Link to={`/hub/${slug}/financeiro/receitas`} className="botao">
+                  <Icone nome="mais" tamanho={16} /> Registrar a primeira receita
+                </Link>
+              </EstadoVazio>
+            )
+          }
 
           return (
             <>

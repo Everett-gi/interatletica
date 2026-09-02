@@ -49,8 +49,8 @@ export function Relatorios() {
   const busca = useBusca<Composicao>(async () => {
     const [painel, indicadores, conquistas] = await Promise.all([
       Dados.painel(slug),
-      Dados.indicadores(),
-      Dados.conquistas(),
+      Dados.indicadores(slug),
+      Dados.conquistas(slug),
     ])
     return { painel, indicadores, conquistas }
   }, [slug])

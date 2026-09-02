@@ -24,7 +24,7 @@ export function Onboarding() {
   const { vinculo } = useSessao()
   const atletica = vinculo(slug)?.atletica
 
-  const passos = useBusca<PassoDeOnboarding[]>(() => Dados.onboarding(), [])
+  const passos = useBusca<PassoDeOnboarding[]>(() => Dados.onboarding(slug), [slug])
 
   return (
     <div>

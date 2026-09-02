@@ -53,6 +53,7 @@ import {
   TAREFAS,
   TORNEIOS,
   atleticaPorSlug,
+  registrarAtletica,
   participantesDoEvento,
   resumirEvento,
 } from './dados'
@@ -76,7 +77,10 @@ interface Estado {
 }
 
 const estado: Estado = {
-  sessao: clonar(SESSAO_DEMO),
+  // Ninguém logado na abertura. A porta de entrada é a tela de boas-vindas,
+  // que oferece os dois caminhos: começar do zero ou abrir a demonstração
+  // já preenchida.
+  sessao: null,
   eventos: clonar(EVENTOS),
   membros: clonar(MEMBROS),
   convites: clonar(CONVITES),
@@ -118,6 +122,50 @@ function gerarSlug(texto: string): string {
     .slice(0, 80)
 }
 
+/**
+ * Garante que o slug não colida com uma atlética que já existe.
+ *
+ * <p>O slug é o endereço público (`/a/dragoes`). Duas atléticas com o mesmo
+ * levariam a segunda a abrir a página da primeira — e no servidor é chave
+ * única, então este é o mesmo tratamento que o backend faz, antecipado.</p>
+ */
+function slugUnico(base: string): string {
+  const raiz = base || 'atletica'
+  if (!atleticaPorSlug(raiz)) {
+    return raiz
+  }
+  let n = 2
+  while (atleticaPorSlug(`${raiz}-${n}`)) {
+    n += 1
+  }
+  return `${raiz}-${n}`
+}
+
+/**
+ * Leitura do estado da demonstração por outros módulos de demo.
+ *
+ * <p>Existe para que conquistas, indicadores e onboarding sejam
+ * <strong>derivados</strong> do que a atlética realmente tem, em vez de
+ * constantes. Uma atlética recém-criada mostrando "74% de presença" e
+ * "primeiro evento conquistado" não é um detalhe cosmético: é a plataforma
+ * mentindo sobre o que a pessoa fez.</p>
+ */
+export const estadoDaDemonstracao = {
+  membrosDe: (slug: string) => estado.membros[slug] ?? [],
+  equipesDe: (slug: string) => estado.equipes.filter((e) => e.atleticaSlug === slug),
+  torneiosDe: (slug: string) => estado.torneios.filter((t) => t.atleticaSlug === slug),
+
+  /** Contagens de evento e presença, que alimentam indicador e conquista. */
+  resumoDeEventos(slug: string) {
+    const eventos = estado.eventos.filter((e) => e.atleticaSlug === slug)
+    const publicados = eventos.filter((e) => e.status === 'PUBLICADO')
+    const inscritos = publicados.reduce((s, e) => s + e.inscritosConfirmados, 0)
+    const presentes = publicados.reduce(
+      (s, e) => s + participantes(e.id).filter((p) => p.checkinEm !== null).length, 0)
+    return { total: eventos.length, publicados: publicados.length, inscritos, presentes }
+  },
+}
+
 // =====================================================================
 // Leituras
 // =====================================================================
@@ -125,9 +173,93 @@ function gerarSlug(texto: string): string {
 export const lojaDemo = {
   sessao: () => responder(estado.sessao),
 
+  /**
+   * Entra na demonstração já preenchida, como presidente dos Dragões.
+   *
+   * <p>Continua existindo ao lado do caminho do zero porque as duas servem a
+   * públicos diferentes: quem vai <em>apresentar</em> a plataforma precisa de
+   * uma atlética com dois anos de história em trinta segundos; quem vai
+   * <em>experimentar</em> precisa do vazio.</p>
+   */
   entrar(): Promise<PerfilDaSessao> {
     estado.sessao = clonar(SESSAO_DEMO)
     return responder(estado.sessao)
+  },
+
+  /**
+   * Cria uma conta sem vínculo com atlética nenhuma.
+   *
+   * <p>É o estado que a plataforma real produz depois do primeiro login: a
+   * pessoa existe e não pertence a lugar nenhum. Daí ela cria a própria
+   * atlética ou espera um convite — não há terceira saída, e é assim de
+   * propósito.</p>
+   */
+  cadastrar(nome: string, email: string): Promise<PerfilDaSessao> {
+    estado.sessao = {
+      id: novoId('u'),
+      nome: nome.trim(),
+      email: email.trim().toLowerCase(),
+      avatarUrl: null,
+      operador: false,
+      atleticas: [],
+      convitesPendentes: 0,
+    }
+    return responder(estado.sessao)
+  },
+
+  /**
+   * Cria a atlética da pessoa — vazia, com ela como presidente.
+   *
+   * <p>Vazia de verdade: sem evento, sem lançamento, sem projeto. Todos os
+   * módulos filtram por slug, então um slug novo devolve lista vazia em toda
+   * parte, e o que aparece é o estado vazio que cada tela já sabe mostrar.
+   * O que <strong>não</strong> fica vazio é a rede: guias, modelos,
+   * fornecedores e as outras atléticas existem independentemente de você, e é
+   * justamente isso que dá o que fazer no primeiro dia.</p>
+   */
+  criarAtletica(dados: {
+    nome: string
+    sigla: string | null
+    instituicao: string
+    cidade: string | null
+    uf: string | null
+    corPrimaria: string | null
+  }): Promise<AtleticaResumo> {
+    const atletica: AtleticaResumo = {
+      slug: slugUnico(gerarSlug(dados.nome)),
+      nome: dados.nome.trim(),
+      sigla: dados.sigla?.trim() || null,
+      instituicao: dados.instituicao.trim(),
+      cidade: dados.cidade?.trim() || null,
+      uf: dados.uf?.trim().toUpperCase() || null,
+      brasaoUrl: null,
+      corPrimaria: dados.corPrimaria,
+    }
+
+    registrarAtletica(atletica)
+
+    const sessao = estado.sessao
+    if (sessao) {
+      estado.membros[atletica.slug] = [{
+        id: novoId('m'),
+        usuarioId: sessao.id,
+        nome: sessao.nome,
+        email: sessao.email,
+        avatarUrl: sessao.avatarUrl,
+        papel: 'PRESIDENTE',
+        cargo: 'Presidente',
+        situacao: 'ATIVO',
+        entrouEm: new Date().toISOString(),
+        saiuEm: null,
+      }]
+      estado.convites[atletica.slug] = []
+      sessao.atleticas = [
+        ...sessao.atleticas,
+        { atletica, papel: 'PRESIDENTE', cargo: 'Presidente' },
+      ]
+    }
+
+    return responder(atletica)
   },
 
   sair(): Promise<null> {
@@ -135,13 +267,23 @@ export const lojaDemo = {
     return responder(null)
   },
 
-  /** Troca quem está logado. Só existe no demo, para mostrar os papéis. */
+  /**
+   * Troca o papel de quem está logado. Só existe no demo, para mostrar o que
+   * cada função enxerga.
+   *
+   * <p>Opera sobre a sessão <em>atual</em>, e não sobre a sessão de exemplo:
+   * quem criou a própria atlética e experimenta ser membro precisa continuar
+   * na atlética dele. Antes isto substituía a sessão inteira pela da Marina,
+   * e a pessoa era teleportada para os Dragões sem entender por quê.</p>
+   */
   assumirPapel(papel: Papel | 'VISITANTE'): Promise<PerfilDaSessao | null> {
     if (papel === 'VISITANTE') {
       estado.sessao = null
       return responder(null)
     }
-    const base = clonar(SESSAO_DEMO)
+    const base = estado.sessao
+      ? clonar(estado.sessao)
+      : clonar(SESSAO_DEMO)
     base.atleticas = base.atleticas.map((v, i) =>
       i === 0 ? { ...v, papel, cargo: rotuloDoCargo(papel) } : v)
     base.operador = papel === 'PRESIDENTE'
@@ -570,11 +712,16 @@ export const lojaDemo = {
       })
     })
 
+    // Derivada, e não constante: uma atlética sem evento nenhum mostrava 74%
+    // de presença, o que é impossível e denuncia número inventado.
+    const totalInscritos = inscricoesPorEvento.reduce((s, p) => s + p.valor, 0)
+    const totalPresentes = presencaPorEvento.reduce((s, p) => s + p.valor, 0)
+
     return responder({
       membrosAtivos: (estado.membros[slug] ?? []).filter((m) => m.situacao === 'ATIVO').length,
       eventosPublicados: publicados.length,
       inscritosNoMes: publicados.reduce((soma, e) => soma + e.inscritosConfirmados, 0),
-      taxaDePresenca: 0.74,
+      taxaDePresenca: totalInscritos === 0 ? 0 : totalPresentes / totalInscritos,
       proximosEventos: eventos
         .filter((e) => new Date(e.inicioEm) >= AGORA && e.status !== 'CANCELADO')
         .sort((a, b) => a.inicioEm.localeCompare(b.inicioEm))

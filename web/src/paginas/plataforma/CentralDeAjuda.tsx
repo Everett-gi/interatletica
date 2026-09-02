@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../ui/icones'
 import { useSessao } from '../../sessao/SessaoContexto'
+import { reiniciarAjuda } from '../../ui/ComoFunciona'
+import { reiniciarTour } from '../../layout/TourInicial'
 
 interface Pergunta {
   pergunta: string
@@ -165,6 +167,7 @@ export function CentralDeAjuda() {
   const [area, setArea] = useState<Area | 'TODAS'>('TODAS')
   const [termo, setTermo] = useState('')
   const [aberta, setAberta] = useState<string | null>(null)
+  const [reiniciado, setReiniciado] = useState<'ajuda' | 'tour' | null>(null)
 
   const alvo = termo.trim().toLowerCase()
   const visiveis = PERGUNTAS
@@ -253,6 +256,55 @@ export function CentralDeAjuda() {
           </div>
         </Secao>
       )}
+
+      <Secao
+        titulo="Aprender a usar"
+        descricao="Cada tela explica o que é na primeira vez que você entra nela. Isso pode ser reativado a qualquer momento."
+      >
+        <div className="grade">
+          <div className="cartao">
+            <Icone nome="info" tamanho={22} />
+            <h3 style={{ marginTop: '0.5rem', marginBottom: '0.2rem' }}>
+              Reabrir as explicações
+            </h3>
+            <p className="fraco" style={{ marginBottom: '0.8rem' }}>
+              As caixas de "o que é esta tela" voltam a aparecer em todos os
+              módulos. Útil quando entra gente nova na diretoria.
+            </p>
+            <button
+              className="botao botao--discreto"
+              onClick={() => { reiniciarAjuda(); setReiniciado('ajuda') }}
+            >
+              Reabrir em todas as telas
+            </button>
+          </div>
+
+          <div className="cartao">
+            <Icone nome="painel" tamanho={22} />
+            <h3 style={{ marginTop: '0.5rem', marginBottom: '0.2rem' }}>
+              Refazer o tour
+            </h3>
+            <p className="fraco" style={{ marginBottom: '0.8rem' }}>
+              As cinco paradas que mostram como navegar: os grupos, o seletor de
+              atlética, a pesquisa e a ajuda de cada tela.
+            </p>
+            <button
+              className="botao botao--discreto"
+              onClick={() => { reiniciarTour(); setReiniciado('tour') }}
+            >
+              Ver de novo ao voltar
+            </button>
+          </div>
+        </div>
+
+        {reiniciado ? (
+          <div className="aviso aviso--sucesso" style={{ marginTop: '0.9rem' }}>
+            {reiniciado === 'ajuda'
+              ? 'Pronto. As explicações voltam a aparecer conforme você abrir cada tela.'
+              : 'Pronto. O tour começa quando você voltar para a sua atlética.'}
+          </div>
+        ) : null}
+      </Secao>
 
       <Secao titulo="Não achou o que procurava?">
         <div className="grade">

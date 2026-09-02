@@ -24,7 +24,7 @@ export function BarraDoTopo({ slug, aoAbrirMenu }: {
   aoAbrirMenu: () => void
 }) {
   const [gavetaAberta, setGavetaAberta] = useState(false)
-  const notificacoes = useBusca<Notificacao[]>(() => Dados.notificacoes(), [])
+  const notificacoes = useBusca<Notificacao[]>(() => Dados.notificacoes(slug), [slug])
   const naoLidas = notificacoes.dados?.filter((n) => !n.lida).length ?? 0
 
   return (
