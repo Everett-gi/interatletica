@@ -11,7 +11,6 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { dataEHora, quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
@@ -26,8 +25,7 @@ type Filtro = 'TODOS' | StatusDoEvento
  */
 export function Eventos() {
   const { slug = '' } = useParams()
-  const { vinculo, podeAtuarComo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const { podeAtuarComo } = useSessao()
 
   const [filtro, setFiltro] = useState<Filtro>('TODOS')
   const eventos = useBusca<EventoResumo[]>(() => Dados.eventosDaAtletica(slug), [slug])

@@ -10,8 +10,6 @@ import {
   rotuloDoTipo,
   useBusca,
 } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
-import { useSessao } from '../../sessao/SessaoContexto'
 
 /**
  * Engajamento e presença.
@@ -23,8 +21,6 @@ import { useSessao } from '../../sessao/SessaoContexto'
  */
 export function Relatorios() {
   const { slug = '' } = useParams()
-  const { vinculo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
 
   const painel = useBusca<PainelDaAtletica>(() => Dados.painel(slug), [slug])
 

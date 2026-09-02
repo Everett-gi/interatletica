@@ -84,6 +84,69 @@ export function doInputParaIso(valor: string): string | null {
   return new Date(valor).toISOString()
 }
 
+const SO_DATA = new Intl.DateTimeFormat(LOCAL, {
+  timeZone: FUSO,
+  day: '2-digit',
+  month: 'short',
+})
+
+const MES_E_ANO = new Intl.DateTimeFormat(LOCAL, {
+  timeZone: FUSO,
+  month: 'long',
+  year: 'numeric',
+})
+
+/** "18 set" — para cartão, tabela e calendário, onde a hora não cabe. */
+export function dataCurta(iso: string | null): string {
+  return iso ? SO_DATA.format(new Date(iso)) : '—'
+}
+
+/** "setembro de 2026" — cabeçalho de mês. */
+export function mesEAno(data: Date): string {
+  return MES_E_ANO.format(data)
+}
+
+const DINHEIRO = new Intl.NumberFormat(LOCAL, {
+  style: 'currency',
+  currency: 'BRL',
+  maximumFractionDigits: 2,
+})
+
+const DINHEIRO_REDONDO = new Intl.NumberFormat(LOCAL, {
+  style: 'currency',
+  currency: 'BRL',
+  maximumFractionDigits: 0,
+})
+
+/**
+ * Dinheiro em reais.
+ *
+ * <p>O padrão arredonda para o real inteiro. Num painel, "R$ 8.420" é o
+ * número que a pessoa quer; "R$ 8.420,00" ocupa mais espaço para dizer o
+ * mesmo. Os centavos aparecem onde importam — lançamento e comprovante —,
+ * pedindo {@code exato}.</p>
+ */
+export function dinheiro(valor: number, exato = false): string {
+  return (exato ? DINHEIRO : DINHEIRO_REDONDO).format(valor)
+}
+
+const NUMERO = new Intl.NumberFormat(LOCAL)
+
+export function numero(valor: number): string {
+  return NUMERO.format(valor)
+}
+
+/** "+18%", "−4%", "0%". O sinal vem antes porque é o que se lê primeiro. */
+export function variacao(percentual: number): string {
+  const sinal = percentual > 0 ? '+' : percentual < 0 ? '−' : ''
+  return `${sinal}${Math.abs(percentual)}%`
+}
+
+/** "68%" a partir de uma proporção de 0 a 1, presa nos limites. */
+export function percentual(proporcao: number): string {
+  return `${Math.round(Math.min(1, Math.max(0, proporcao)) * 100)}%`
+}
+
 /** O caminho inverso: ISO da API para o formato que o input aceita. */
 export function doIsoParaInput(iso: string | null): string {
   if (!iso) {

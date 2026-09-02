@@ -54,8 +54,10 @@ interatletica/
 │       ├── api/                cliente HTTP, tipos, mapa de rotas
 │       ├── dados/              a fachada: API real ou demonstração
 │       ├── demo/               dados fictícios e loja em memória
-│       ├── ui/                 design system, tema por atlética
+│       ├── ui/                 design system, ícones, tema por atlética
+│       ├── layout/             casca do app: barra lateral, topo, busca
 │       ├── sessao/             quem está logado e com que papel
+│       ├── RotasDoHub.tsx      as telas de trabalho, carregadas sob demanda
 │       └── paginas/            públicas na raiz, hub/ para a diretoria
 ├── vercel.json                 deploy do front em modo demonstração
 └── infra/
@@ -122,13 +124,51 @@ Hoje as ordens são explícitas em `OrdemDosAspectos`, e `OrdemDoFiltroDeAtletic
 
 ## O front
 
-Três camadas de tela, com públicos diferentes:
+Dois ambientes, com cascas diferentes e públicos diferentes:
 
-**Rede** — o que só existe olhando várias atléticas juntas. A agenda unificada, o diretório e o quadro de medalhas da temporada. É o que dá nome ao produto: cada atlética já tem grupo de WhatsApp e Instagram; o que nenhuma tem sozinha é a visão do que está acontecendo na rede.
+**O público** — topo simples e conteúdo estreito. A página da atlética, a página do evento (o link que circula no WhatsApp), o convite e o quadro de medalhas. Login só no último passo, na hora de se inscrever: pedir conta antes de dizer do que se trata é pedir crachá para quem só quer saber a hora da festa. Quem chega aqui não tem navegação de produto para usar, e oferecer uma só atrapalha.
 
-**Público** — a página da atlética e a página do evento, que é o link que circula no WhatsApp. Login só no último passo, na hora de se inscrever: pedir conta antes de dizer do que se trata é pedir crachá para quem só quer saber a hora da festa.
+**O ambiente de trabalho** — barra lateral com onze grupos, topo com pesquisa global, notificações, seletor de organização e ações rápidas. É onde a diretoria passa o tempo, e onde a densidade se paga.
 
-**Hub** — a área de quem administra, com barra lateral: painel, eventos, equipes, torneios, avisos, tarefas, relatórios e membros. A portaria fica deliberadamente fora deste layout — é tela de tarefa única, sem navegação, porque cada elemento a mais é um toque errado esperando acontecer.
+A portaria fica deliberadamente fora dos dois — é tela de tarefa única, sem navegação, porque cada elemento a mais é um toque errado esperando acontecer.
+
+### Os módulos
+
+A navegação agrupa por assunto, não por tela solta. Quarenta itens numa coluna não é navegação, é lista telefônica.
+
+| Grupo | O que resolve |
+|---|---|
+| **Minha atlética** | visão geral, membros, diretoria em organograma, gestões, documentos, patrimônio |
+| **Gestão** | tarefas em quadro e lista, projetos com modelo da rede, reuniões com pauta e ata, decisões com votação, metas |
+| **Eventos** | calendário unificado, eventos, campeonatos com chave e tabela, inscrições, viagens |
+| **Esportes** | equipes, atletas, jogos, resultados e rankings |
+| **Financeiro** | caixa, receitas, despesas, orçamento previsto contra realizado, prestação de contas |
+| **Rede** | explorar atléticas com mapa, feed, comunidades, parcerias, pedidos de ajuda, amistosos |
+| **Conhecimento** | guias, modelos, banco de experiências, mentoria, banco de talentos |
+| **Mercado** | fornecedores avaliados, oportunidades, compras coletivas, funil de patrocínio, loja |
+| **Comunicação** | notícias, campanhas com calendário editorial, biblioteca de mídia, mural de avisos |
+
+Três decisões que valem registro:
+
+- **Resumo primeiro, detalhe depois.** Nenhuma página abre com tabela. O financeiro abre no saldo, o patrimônio abre no resumo por categoria, o campeonato abre na fase atual. A tabela existe — em aba, ou depois de rolar.
+- **O painel muda com a função.** O tesoureiro abre no caixa, o diretor de esportes abre nos jogos, o membro abre no que pode fazer. A função vem do cargo que a própria atlética escreveu, com o papel como rede de segurança — impor uma lista fechada de cargos quebraria toda atlética que se organiza de outro jeito.
+- **Item sem permissão não aparece.** Mostrar e negar no clique é pior que não mostrar, porque promete uma coisa que não vai acontecer.
+
+### Os módulos conversam
+
+Um campeonato criado aparece no calendário, no painel, nos eventos, nas tarefas e no financeiro — sem ninguém cadastrar duas vezes. O saldo, o orçamento realizado e o gráfico de evolução são **derivados dos lançamentos**, e não totais guardados à parte que desandam na primeira correção. A tabela de classificação sai das partidas encerradas: corrigir um placar reordena a tabela sozinho.
+
+É a diferença entre um ecossistema e um conjunto de páginas com o mesmo cabeçalho.
+
+### Peso
+
+O ambiente de trabalho é carregado sob demanda (`RotasDoHub`, via `lazy`). São mais de quarenta telas, e quem abre um link de evento no WhatsApp não usa nenhuma delas — sem a divisão, a página pública pagaria pelo app inteiro antes de mostrar a primeira linha.
+
+Não há biblioteca de ícones nem de gráficos. Os cerca de setenta símbolos são SVG de traço escritos em `ui/icones.tsx`, na mesma grade e com a mesma espessura; os gráficos são `path` calculado à mão. Qualquer pacote custaria mais bytes do que os arquivos inteiros — justamente na primeira visita, que é a que decide se a pessoa espera carregar.
+
+### Datas do demo são relativas
+
+A âncora temporal do modo demonstração é **hoje**, não uma data fixa. Era fixa, e a intenção estava certa mas o efeito era o oposto: com o calendário andando e a âncora parada, todo evento "daqui a três dias" virava "há duas semanas", e uma demonstração aberta um mês depois mostrava um campeonato que já tinha acontecido.
 
 ### Cada atlética pinta o hub
 
@@ -276,14 +316,22 @@ Além do previsto, entraram porque o MVP não fecha sem eles: lista de espera co
 
 Falta antes de considerar a fase encerrada: testes de integração com Testcontainers (escritos contra Postgres real, exigem Docker) e a leitura do QR pela câmera — hoje a portaria aceita o código digitado ou colado, que é o caminho que funciona no escuro do ginásio quando a câmera falha.
 
-**Fase 2 — Torneios**
-Equipes · chaveamento · registro de resultado · tabela ao vivo · regulamento anexo · check-in por QR code.
+**Fases 2 a 7 — front implementado, API pendente**
 
-**Fase 3 — Gestão**
-Tarefas por evento · avisos com push · painel de presença e engajamento por atlética.
+O front cobre hoje os módulos de gestão, eventos e esportes, financeiro, rede, conhecimento, mercado e comunicação — navegáveis, com dados fictícios coerentes entre si e um cabeçalho de *prévia* em cada tela que ainda não persiste. A ordem de implementação da API acompanha o valor por esforço:
 
-**Fase 4 — Só se houver demanda real**
-Sócios e carteirinha digital · financeiro por evento.
+| Fase | Escopo | Estado |
+|---|---|---|
+| 2 — Torneios | equipes, chaveamento, resultado, tabela ao vivo | front pronto, API pendente |
+| 3 — Gestão | tarefas, projetos, reuniões, decisões, metas, documentos | front pronto, API pendente |
+| 4 — Rede | explorar, feed, comunidades, pedidos de ajuda, parcerias, amistosos | front pronto, API pendente |
+| 5 — Conhecimento | guias, modelos, experiências, fornecedores avaliados | front pronto, API pendente |
+| 6 — Financeiro | caixa, orçamento, prestação de contas, patrimônio, patrocínio | front pronto, API pendente |
+| 7 — Inteligência | indicadores, comparação com a rede, conquistas, mentoria | front pronto, API pendente |
+
+**Fora de escopo, por decisão de produto**
+
+A plataforma **não processa pagamento**. A loja é vitrine — produto, preço, estoque e como combinar; a negociação acontece pelos canais que a atlética já usa. O financeiro registra o que entrou e saiu para a prestação de contas existir; ele não movimenta dinheiro. Receber de estudante cria responsabilidade fiscal e de reembolso que uma atlética não tem como assumir por meio de um app de terceiros, e que a plataforma não quer assumir por ela.
 
 ---
 

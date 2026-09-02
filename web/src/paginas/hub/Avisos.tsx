@@ -10,7 +10,6 @@ import {
   Vazio,
 } from '../../ui/componentes'
 import { Previa } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
@@ -31,8 +30,7 @@ const PUBLICO: Record<PublicoDoAviso, { rotulo: string; explica: string }> = {
  */
 export function Avisos() {
   const { slug = '' } = useParams()
-  const { vinculo, podeAtuarComo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const { podeAtuarComo } = useSessao()
 
   const avisos = useBusca<Aviso[]>(() => Dados.avisos(slug), [slug])
   const diretor = podeAtuarComo(slug, 'DIRETOR')

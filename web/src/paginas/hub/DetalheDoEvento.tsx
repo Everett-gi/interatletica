@@ -14,15 +14,13 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { dataEHora, hora } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
 /** A tela de trabalho da diretoria durante um evento. */
 export function DetalheDoEvento() {
   const { slug = '', eventoId = '' } = useParams()
-  const { vinculo, podeAtuarComo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const { podeAtuarComo } = useSessao()
 
   const diretor = podeAtuarComo(slug, 'DIRETOR')
   const busca = useBusca<Evento | null>(() => Dados.evento(slug, eventoId),

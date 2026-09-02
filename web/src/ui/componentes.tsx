@@ -5,8 +5,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react'
+import { Link } from 'react-router-dom'
 import { FalhaDaApi } from '../api/cliente'
 import type { AtleticaResumo, StatusDoEvento, TipoDeEvento } from '../api/tipos'
+import { Icone, type NomeDoIcone } from './icones'
 import { corDerivada, iniciais } from './tema'
 
 /** As peças repetidas em quase toda tela, e o hook que busca dados. */
@@ -38,11 +40,35 @@ export function Esqueleto({ altura = '4rem', largura = '100%' }: {
   return <div className="esqueleto" style={{ height: altura, width: largura }} />
 }
 
-export function MensagemDeErro({ erro }: { erro: unknown }) {
+/**
+ * Erro em português, com saída (§76).
+ *
+ * <p>"Error 500" não diz à pessoa nem o que falhou nem o que fazer. A
+ * mensagem da API já vem escrita para o usuário final; quando não há
+ * mensagem — queda de rede, proxy fora —, entra um texto que descreve o
+ * problema e oferece a única ação que costuma resolver: tentar de novo.</p>
+ */
+export function MensagemDeErro({ erro, aoTentarNovamente }: {
+  erro: unknown
+  aoTentarNovamente?: () => void
+}) {
   const texto = erro instanceof FalhaDaApi
     ? erro.message
-    : 'Algo deu errado. Tente novamente em instantes.'
-  return <div className="aviso aviso--erro" role="alert">{texto}</div>
+    : 'Não conseguimos carregar esta parte agora.'
+  return (
+    <div className="aviso aviso--erro" role="alert">
+      <div>{texto}</div>
+      {aoTentarNovamente ? (
+        <button
+          className="botao botao--discreto botao--pequeno"
+          style={{ marginTop: '0.6rem' }}
+          onClick={aoTentarNovamente}
+        >
+          Tentar novamente
+        </button>
+      ) : null}
+    </div>
+  )
 }
 
 export function Vazio({ titulo, children }: { titulo?: string; children?: ReactNode }) {
@@ -105,7 +131,7 @@ export function Conteudo<T>({ busca, children, esqueleto }: {
     return <>{esqueleto ?? <Carregando />}</>
   }
   if (busca.erro) {
-    return <MensagemDeErro erro={busca.erro} />
+    return <MensagemDeErro erro={busca.erro} aoTentarNovamente={busca.recarregar} />
   }
   if (busca.dados === null) {
     return <Vazio titulo="Não encontrado">O conteúdo não está disponível.</Vazio>
@@ -196,19 +222,41 @@ export function rotuloDoPapel(papel: string): string {
 // Métricas e gráficos
 // ---------------------------------------------------------------------
 
-export function Metrica({ rotulo, valor, detalhe, cor }: {
+/**
+ * O cartão de número.
+ *
+ * <p>Vira link quando recebe {@code para}: um indicador que não leva a lugar
+ * nenhum obriga a pessoa a procurar na navegação de onde ele saiu. "12
+ * tarefas abertas" deve abrir as doze.</p>
+ */
+export function Metrica({ rotulo, valor, detalhe, cor, icone, extra, para }: {
   rotulo: string
   valor: ReactNode
   detalhe?: string
   cor?: string
+  icone?: NomeDoIcone
+  /** Variação, selo ou qualquer coisa que acompanhe o número. */
+  extra?: ReactNode
+  para?: string
 }) {
-  return (
-    <div className="cartao">
-      <div className="fraco">{rotulo}</div>
-      <div className="numero-grande" style={cor ? { color: cor } : undefined}>{valor}</div>
+  const corpo = (
+    <>
+      <div className="metrica__topo">
+        {icone ? <Icone nome={icone} tamanho={15} /> : null}
+        <span style={{ flex: 1, minWidth: 0 }}>{rotulo}</span>
+        {para ? <Icone nome="direita" tamanho={14} /> : null}
+      </div>
+      <div className="linha" style={{ gap: '0.5rem', alignItems: 'baseline' }}>
+        <div className="numero-grande" style={cor ? { color: cor } : undefined}>{valor}</div>
+        {extra}
+      </div>
       {detalhe ? <div className="fraco">{detalhe}</div> : null}
-    </div>
+    </>
   )
+
+  return para
+    ? <Link to={para} className="cartao cartao--clicavel">{corpo}</Link>
+    : <div className="cartao">{corpo}</div>
 }
 
 /**
@@ -285,25 +333,33 @@ export function Anel({ proporcao, rotulo }: { proporcao: number; rotulo: string 
 // Abas
 // ---------------------------------------------------------------------
 
+/**
+ * Abas sublinhadas.
+ *
+ * <p>Eram botões-pílula, e pílula é o desenho de <em>ação</em>. Numa página
+ * cheia de botões de verdade — publicar, convidar, criar —, trocar de aba
+ * parecia executar alguma coisa. O sublinhado diz "isto muda o que você
+ * está vendo", que é o que uma aba faz.</p>
+ */
 export function Abas<T extends string>({ opcoes, atual, aoTrocar }: {
   opcoes: { valor: T; rotulo: string; contagem?: number }[]
   atual: T
   aoTrocar: (valor: T) => void
 }) {
   return (
-    <div className="linha" role="tablist" style={{ gap: '0.3rem', marginBottom: '1rem' }}>
+    <div className="abas" role="tablist">
       {opcoes.map((opcao) => (
         <button
           key={opcao.valor}
           role="tab"
+          type="button"
           aria-selected={atual === opcao.valor}
-          className={`botao botao--pequeno ${
-            atual === opcao.valor ? '' : 'botao--fantasma'}`}
+          className="aba"
           onClick={() => aoTrocar(opcao.valor)}
         >
           {opcao.rotulo}
           {opcao.contagem !== undefined ? (
-            <span style={{ opacity: 0.65 }}> {opcao.contagem}</span>
+            <span className="aba__contagem">{opcao.contagem}</span>
           ) : null}
         </button>
       ))}

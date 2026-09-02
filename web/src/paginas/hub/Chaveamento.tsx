@@ -10,7 +10,6 @@ import {
   Vazio,
 } from '../../ui/componentes'
 import { Previa } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { dataEHora } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
@@ -25,21 +24,17 @@ import { useSessao } from '../../sessao/SessaoContexto'
  */
 export function Chaveamento() {
   const { slug = '', eventoId = '' } = useParams()
-  const { vinculo, podeAtuarComo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const { podeAtuarComo } = useSessao()
 
   const diretor = podeAtuarComo(slug, 'DIRETOR')
   const busca = useBusca<Torneio | null>(
     () => Dados.torneioDoEvento(eventoId), [eventoId])
-  const [emEdicao, setEmEdicao] = useState<Partida | null>(null)
 
   if (busca.carregando) return <Carregando />
   if (busca.erro) return <MensagemDeErro erro={busca.erro} />
   if (!busca.dados) return <Vazio titulo="Torneio não encontrado" />
 
   const torneio = busca.dados
-  const rodadas = agruparPorRodada(torneio.partidas)
-  const porId = new Map(torneio.participantes.map((p) => [p.id, p]))
 
   return (
     <div className="pilha">
@@ -55,6 +50,35 @@ export function Chaveamento() {
 
       <Previa oQueFalta="Registrar placar ainda não chega ao servidor." />
 
+      <QuadroDeChaveamento
+        torneio={torneio}
+        podeEditar={diretor}
+        aoAtualizar={busca.definir}
+      />
+
+      <Classificacao participantes={torneio.participantes} />
+    </div>
+  )
+}
+
+/**
+ * O desenho do chaveamento, isolado da rota.
+ *
+ * <p>Extraído porque um campeonato é alcançável por dois caminhos — pelo
+ * evento e pela seção Campeonatos — e duplicar o desenho garantiria que uma
+ * das cópias envelhecesse. Quem tem o torneio em mãos monta a chave.</p>
+ */
+export function QuadroDeChaveamento({ torneio, podeEditar, aoAtualizar }: {
+  torneio: Torneio
+  podeEditar: boolean
+  aoAtualizar: (torneio: Torneio) => void
+}) {
+  const [emEdicao, setEmEdicao] = useState<Partida | null>(null)
+  const rodadas = agruparPorRodada(torneio.partidas)
+  const porId = new Map(torneio.participantes.map((p) => [p.id, p]))
+
+  return (
+    <>
       <div className="chave">
         {rodadas.map(({ rodada, partidas }) => (
           <div key={rodada} className="chave__rodada">
@@ -64,14 +88,12 @@ export function Chaveamento() {
                 key={partida.id}
                 partida={partida}
                 porId={porId}
-                aoEditar={diretor ? () => setEmEdicao(partida) : undefined}
+                aoEditar={podeEditar ? () => setEmEdicao(partida) : undefined}
               />
             ))}
           </div>
         ))}
       </div>
-
-      <Classificacao participantes={torneio.participantes} />
 
       {emEdicao ? (
         <DialogoDePlacar
@@ -80,14 +102,16 @@ export function Chaveamento() {
           porId={porId}
           aoFechar={() => setEmEdicao(null)}
           aoSalvar={(atualizado) => {
-            busca.definir(atualizado)
+            aoAtualizar(atualizado)
             setEmEdicao(null)
           }}
         />
       ) : null}
-    </div>
+    </>
   )
 }
+
+export { Classificacao as ClassificacaoDoTorneio }
 
 function agruparPorRodada(partidas: Partida[]) {
   const mapa = new Map<number, Partida[]>()

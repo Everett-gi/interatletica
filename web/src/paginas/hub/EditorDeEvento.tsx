@@ -3,9 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { Evento, TipoDeEvento, Visibilidade } from '../../api/tipos'
 import { Carregando, MensagemDeErro } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
 import { doInputParaIso, doIsoParaInput } from '../../formatos'
-import { useSessao } from '../../sessao/SessaoContexto'
 
 const TIPOS: { valor: TipoDeEvento; rotulo: string }[] = [
   { valor: 'ESPORTIVO', rotulo: 'Esportivo' },
@@ -48,8 +46,6 @@ const VAZIO: Formulario = {
 export function EditorDeEvento() {
   const { slug = '', eventoId } = useParams()
   const navegar = useNavigate()
-  const { vinculo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
 
   const editando = Boolean(eventoId)
   const [dados, setDados] = useState<Formulario>(VAZIO)

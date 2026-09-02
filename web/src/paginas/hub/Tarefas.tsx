@@ -1,10 +1,16 @@
-import { useState, type DragEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { useMemo, useState, type DragEvent } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { PrioridadeDaTarefa, StatusDaTarefa, Tarefa } from '../../api/tipos-rede'
-import { Avatar, Conteudo, Esqueleto, useBusca } from '../../ui/componentes'
-import { Previa } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
+import { Avatar, Conteudo, Esqueleto, Previa, useBusca } from '../../ui/componentes'
+import {
+  CabecalhoDePagina,
+  Chips,
+  EstadoVazio,
+  Secao,
+  Segmentado,
+} from '../../ui/pagina'
+import { Icone } from '../../ui/icones'
 import { quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
@@ -20,22 +26,29 @@ const PRIORIDADE: Record<PrioridadeDaTarefa, { rotulo: string; classe: string }>
   BAIXA: { rotulo: 'baixa', classe: '' },
 }
 
+type Visao = 'QUADRO' | 'LISTA'
+type Filtro = 'TODAS' | 'MINHAS' | 'ATRASADAS' | 'SEMANA' | 'SEM_DONO'
+
 /**
- * O quadro de tarefas da diretoria.
+ * O quadro de tarefas da diretoria (§18).
  *
- * <p>Kanban de três colunas, e não uma lista com caixinha de marcar, porque
- * o problema real de uma diretoria não é "o que falta" — é "quem está com
- * o quê". A coluna do meio é a informação que a lista esconde.</p>
+ * <p>Kanban por padrão, porque o problema real de uma diretoria não é "o que
+ * falta" — é "quem está com o quê", e a coluna do meio é justamente a
+ * informação que uma lista esconde. Mas a lista também existe: para escanear
+ * prazo e responsável de trinta tarefas, ela ganha do quadro.</p>
  */
 export function Tarefas() {
   const { slug = '' } = useParams()
-  const { vinculo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const [parametros] = useSearchParams()
+  const { perfil } = useSessao()
 
   const tarefas = useBusca<Tarefa[]>(() => Dados.tarefas(slug), [slug])
+  const [visao, setVisao] = useState<Visao>('QUADRO')
+  const [filtro, setFiltro] = useState<Filtro>('TODAS')
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [alvo, setAlvo] = useState<StatusDaTarefa | null>(null)
   const [novoTitulo, setNovoTitulo] = useState('')
+  const [compondo, setCompondo] = useState(parametros.get('novo') === '1')
 
   async function mover(id: string, status: StatusDaTarefa) {
     // Move na tela primeiro: arrastar e esperar meio segundo pelo servidor
@@ -62,71 +75,230 @@ export function Tarefas() {
     }
   }
 
+  const filtradas = useMemo(() => {
+    const lista = tarefas.dados ?? []
+    const agora = Date.now()
+    const semana = agora + 7 * 864e5
+
+    switch (filtro) {
+      case 'MINHAS':
+        return lista.filter((t) => t.responsavelNome === perfil?.nome)
+      case 'ATRASADAS':
+        return lista.filter((t) => t.status !== 'CONCLUIDA' && t.prazo !== null
+          && new Date(t.prazo).getTime() < agora)
+      case 'SEMANA':
+        return lista.filter((t) => t.prazo !== null
+          && new Date(t.prazo).getTime() <= semana)
+      case 'SEM_DONO':
+        return lista.filter((t) => t.responsavelNome === null)
+      default:
+        return lista
+    }
+  }, [tarefas.dados, filtro, perfil?.nome])
+
+  const lista = tarefas.dados ?? []
+  const agora = Date.now()
+  const contar = (f: Filtro) => {
+    switch (f) {
+      case 'MINHAS': return lista.filter((t) => t.responsavelNome === perfil?.nome).length
+      case 'ATRASADAS': return lista.filter((t) => t.status !== 'CONCLUIDA'
+        && t.prazo !== null && new Date(t.prazo).getTime() < agora).length
+      case 'SEMANA': return lista.filter((t) => t.prazo !== null
+        && new Date(t.prazo).getTime() <= agora + 7 * 864e5).length
+      case 'SEM_DONO': return lista.filter((t) => t.responsavelNome === null).length
+      default: return lista.length
+    }
+  }
+
   return (
-    <div className="pilha">
-      <header>
-        <h1>Tarefas</h1>
-        <p className="fraco" style={{ margin: 0 }}>
-          Arraste entre as colunas. Quem está com o quê é a pergunta que uma
-          lista simples não responde.
-        </p>
-      </header>
+    <div>
+      <CabecalhoDePagina
+        titulo="Tarefas"
+        descricao="Quem está com o quê. Arraste entre as colunas ou use os botões — funciona nos dois."
+        acoes={
+          <>
+            <Segmentado
+              rotulo="Forma de ver as tarefas"
+              atual={visao}
+              aoTrocar={setVisao}
+              opcoes={[
+                { valor: 'QUADRO', rotulo: 'Quadro', icone: 'tarefas' },
+                { valor: 'LISTA', rotulo: 'Lista', icone: 'lista' },
+              ]}
+            />
+            <button className="botao" onClick={() => setCompondo((v) => !v)}>
+              <Icone nome="mais" tamanho={16} /> Nova tarefa
+            </button>
+          </>
+        }
+      />
 
       <Previa oQueFalta="Criar e mover tarefa ainda não chega ao servidor." />
 
-      <div className="linha">
-        <input
-          value={novoTitulo}
-          onChange={(e) => setNovoTitulo(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void criar() }}
-          placeholder="Nova tarefa e Enter"
-          aria-label="Título da nova tarefa"
-          style={{ maxWidth: '24rem' }}
+      {compondo ? (
+        <div className="cartao" style={{ marginBottom: '1.1rem' }}>
+          <div className="linha">
+            <input
+              value={novoTitulo}
+              onChange={(e) => setNovoTitulo(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void criar() }}
+              placeholder="O que precisa ser feito?"
+              aria-label="Título da nova tarefa"
+              autoFocus
+              style={{ flex: 1, minWidth: '14rem' }}
+            />
+            <button className="botao" onClick={() => void criar()}
+                    disabled={!novoTitulo.trim()}>
+              Adicionar
+            </button>
+            <button className="botao botao--fantasma" onClick={() => setCompondo(false)}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ marginBottom: '1.1rem' }}>
+        <Chips
+          rotulo="Filtros de tarefa"
+          selecionado={filtro}
+          aoSelecionar={setFiltro}
+          opcoes={[
+            { valor: 'TODAS', rotulo: 'Todas', contagem: contar('TODAS') },
+            { valor: 'MINHAS', rotulo: 'Minhas', contagem: contar('MINHAS') },
+            { valor: 'ATRASADAS', rotulo: 'Atrasadas', contagem: contar('ATRASADAS') },
+            { valor: 'SEMANA', rotulo: 'Esta semana', contagem: contar('SEMANA') },
+            { valor: 'SEM_DONO', rotulo: 'Sem responsável', contagem: contar('SEM_DONO') },
+          ]}
         />
-        <button className="botao" onClick={() => void criar()} disabled={!novoTitulo.trim()}>
-          Adicionar
-        </button>
       </div>
 
-      <Conteudo busca={tarefas} esqueleto={<Esqueleto altura="16rem" />}>
-        {(lista) => (
-          <div className="kanban">
-            {COLUNAS.map((coluna) => {
-              const daColuna = lista.filter((t) => t.status === coluna.status)
-              return (
-                <div
-                  key={coluna.status}
-                  className={`coluna ${alvo === coluna.status ? 'coluna--alvo' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); setAlvo(coluna.status) }}
-                  onDragLeave={() => setAlvo(null)}
-                  onDrop={(e) => aoSoltar(e, coluna.status)}
-                >
-                  <div className="coluna__titulo">
-                    <span>{coluna.titulo}</span>
-                    <span>{daColuna.length}</span>
-                  </div>
+      <Conteudo busca={tarefas} esqueleto={<Esqueleto altura="18rem" />}>
+        {() => {
+          if (filtradas.length === 0) {
+            return (
+              <EstadoVazio icone="tarefas" titulo="Nenhuma tarefa neste filtro">
+                <p className="fraco">
+                  {filtro === 'ATRASADAS'
+                    ? 'Nada atrasado. É o melhor resultado possível aqui.'
+                    : 'Mude o filtro ou crie a primeira tarefa.'}
+                </p>
+              </EstadoVazio>
+            )
+          }
 
-                  {daColuna.map((tarefa) => (
-                    <Ficha
-                      key={tarefa.id}
-                      tarefa={tarefa}
-                      arrastando={arrastando === tarefa.id}
-                      aoIniciarArraste={() => setArrastando(tarefa.id)}
-                      aoTerminarArraste={() => setArrastando(null)}
-                      aoMover={(status) => void mover(tarefa.id, status)}
-                    />
-                  ))}
-
-                  {daColuna.length === 0 ? (
-                    <div className="fraco" style={{ padding: '0.6rem', textAlign: 'center' }}>
-                      vazio
-                    </div>
-                  ) : null}
+          if (visao === 'LISTA') {
+            return (
+              <Secao>
+                <div className="rolagem">
+                  <table className="tabela-cartoes">
+                    <thead>
+                      <tr>
+                        <th>Tarefa</th>
+                        <th>Responsável</th>
+                        <th>Prazo</th>
+                        <th>Prioridade</th>
+                        <th>Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtradas.map((t) => {
+                        const atrasada = t.prazo !== null && t.status !== 'CONCLUIDA'
+                          && new Date(t.prazo) < new Date()
+                        return (
+                          <tr key={t.id}>
+                            <td data-rotulo="Tarefa">
+                              <div style={{
+                                fontWeight: 550,
+                                textDecoration: t.status === 'CONCLUIDA'
+                                  ? 'line-through' : undefined,
+                              }}>
+                                {t.titulo}
+                              </div>
+                              {t.eventoTitulo ? (
+                                <div className="fraco">{t.eventoTitulo}</div>
+                              ) : null}
+                            </td>
+                            <td data-rotulo="Responsável">
+                              {t.responsavelNome ?? (
+                                <span className="fraco">sem responsável</span>
+                              )}
+                            </td>
+                            <td data-rotulo="Prazo">
+                              {t.prazo ? (
+                                <span className={atrasada ? 'etiqueta etiqueta--perigo' : ''}>
+                                  {quando(t.prazo)}
+                                </span>
+                              ) : <span className="fraco">—</span>}
+                            </td>
+                            <td data-rotulo="Prioridade">
+                              <span className={`etiqueta ${PRIORIDADE[t.prioridade].classe}`}>
+                                {PRIORIDADE[t.prioridade].rotulo}
+                              </span>
+                            </td>
+                            <td data-rotulo="Situação">
+                              <select
+                                value={t.status}
+                                onChange={(e) =>
+                                  void mover(t.id, e.target.value as StatusDaTarefa)}
+                                aria-label={`Situação de ${t.titulo}`}
+                                style={{ width: 'auto', minHeight: '34px' }}
+                              >
+                                {COLUNAS.map((c) => (
+                                  <option key={c.status} value={c.status}>{c.titulo}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )
-            })}
-          </div>
-        )}
+              </Secao>
+            )
+          }
+
+          return (
+            <div className="kanban">
+              {COLUNAS.map((coluna) => {
+                const daColuna = filtradas.filter((t) => t.status === coluna.status)
+                return (
+                  <div
+                    key={coluna.status}
+                    className={`coluna ${alvo === coluna.status ? 'coluna--alvo' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setAlvo(coluna.status) }}
+                    onDragLeave={() => setAlvo(null)}
+                    onDrop={(e) => aoSoltar(e, coluna.status)}
+                  >
+                    <div className="coluna__titulo">
+                      <span>{coluna.titulo}</span>
+                      <span>{daColuna.length}</span>
+                    </div>
+
+                    {daColuna.map((tarefa) => (
+                      <Ficha
+                        key={tarefa.id}
+                        tarefa={tarefa}
+                        arrastando={arrastando === tarefa.id}
+                        aoIniciarArraste={() => setArrastando(tarefa.id)}
+                        aoTerminarArraste={() => setArrastando(null)}
+                        aoMover={(status) => void mover(tarefa.id, status)}
+                      />
+                    ))}
+
+                    {daColuna.length === 0 ? (
+                      <div className="fraco" style={{ padding: '0.6rem',
+                                                      textAlign: 'center' }}>
+                        vazio
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        }}
       </Conteudo>
     </div>
   )

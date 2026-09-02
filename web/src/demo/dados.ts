@@ -33,10 +33,27 @@ import type {
   Torneio,
 } from '../api/tipos-rede'
 
-/** Âncora temporal fixa: o demo não pode "envelhecer" e ficar todo no passado. */
-export const AGORA = new Date('2026-08-29T18:00:00-03:00')
+/**
+ * A âncora temporal do demo: hoje, às 18h.
+ *
+ * <p>Era uma data fixa, e a intenção estava certa mas o efeito era o oposto:
+ * com o calendário andando e a âncora parada, todo evento "daqui a três
+ * dias" virava "há duas semanas". Uma demonstração aberta um mês depois
+ * mostrava um campeonato que já tinha acontecido e uma votação que fechou
+ * anteontem.</p>
+ *
+ * <p>Ancorar em <em>hoje</em> preserva as duas propriedades que importam: os
+ * intervalos relativos continuam os mesmos — o interatlética é sempre daqui
+ * a 23 dias — e a hora fixa mantém o resultado idêntico durante a visita
+ * inteira, sem depender do minuto em que a página abriu.</p>
+ */
+export const AGORA = (() => {
+  const hoje = new Date()
+  hoje.setHours(18, 0, 0, 0)
+  return hoje
+})()
 
-function dias(quantidade: number, hora = 20, minuto = 0): string {
+export function dias(quantidade: number, hora = 20, minuto = 0): string {
   const data = new Date(AGORA)
   data.setDate(data.getDate() + quantidade)
   data.setHours(hora, minuto, 0, 0)
@@ -487,6 +504,9 @@ export const EQUIPES: Equipe[] = [
     ativa: true,
     elenco: [
       { usuarioId: 'u-03', nome: 'Camila Toledo', avatarUrl: null, funcao: 'CAPITAO', numero: 7, nick: null },
+      // A presidente também joga. É o caso comum numa atlética, e é o que
+      // faz "Meu histórico" mostrar algo além de cargos.
+      { usuarioId: 'u-01', nome: 'Marina Alencar', avatarUrl: null, funcao: 'TITULAR', numero: 5, nick: null },
       { usuarioId: 'u-07', nome: 'Larissa Prado', avatarUrl: null, funcao: 'TITULAR', numero: 10, nick: null },
       { usuarioId: 'u-09', nome: 'Helena Vasques', avatarUrl: null, funcao: 'TITULAR', numero: 4, nick: null },
       { usuarioId: 'u-11', nome: 'Isabela Cunha', avatarUrl: null, funcao: 'RESERVA', numero: 12, nick: null },
@@ -627,7 +647,10 @@ export const TAREFAS: Tarefa[] = [
     titulo: 'Publicar regulamento das modalidades',
     descricao: null,
     responsavelId: 'u-04', responsavelNome: 'Diego Marinho', responsavelAvatarUrl: null,
-    prazo: dias(7), prioridade: 'MEDIA', status: 'ABERTA', concluidaEm: null,
+    // Atrasada de propósito: é o caso que faz o selo da navegação, o alerta
+    // do painel e a notificação existirem. Um demo sem nenhuma pendência
+    // vencida esconde metade do que a tela sabe fazer.
+    prazo: dias(-2), prioridade: 'MEDIA', status: 'ABERTA', concluidaEm: null,
   },
   {
     id: 'tf-04', atleticaSlug: 'dragoes', eventoId: 'e-02',

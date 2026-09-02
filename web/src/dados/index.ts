@@ -20,6 +20,7 @@
 
 import { Api } from '../api/rotas'
 import { lojaDemo } from '../demo/loja'
+import { lojaDosModulos } from '../demo/lojaDosModulos'
 
 /**
  * Ligado por variável de ambiente no build. No Vercel vem `true`; local, com
@@ -93,4 +94,13 @@ export const Dados = {
   avisos: lojaDemo.avisos,
   publicarAviso: lojaDemo.publicarAviso,
   painel: lojaDemo.painel,
+
+  // ------------------------------------------------------------------
+  // Módulos de gestão, financeiro, rede, conhecimento, mercado e
+  // comunicação. Todos em demonstração: a migration prevê as tabelas,
+  // mas os endpoints ainda não existem. Espalhar essa distinção pelas
+  // telas seria pior — a fachada continua sendo o único lugar que sabe
+  // de onde o dado vem.
+  // ------------------------------------------------------------------
+  ...lojaDosModulos,
 }

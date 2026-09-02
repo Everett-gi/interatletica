@@ -1,141 +1,357 @@
 import { useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { Convite, Membro as MembroDto, Papel } from '../../api/tipos'
 import {
   Avatar,
   Conteudo,
   Esqueleto,
+  Metrica,
   rotuloDoPapel,
   useBusca,
-  Vazio,
 } from '../../ui/componentes'
-import { useCorDaAtletica } from '../../ui/useCorDaAtletica'
+import {
+  CabecalhoDePagina,
+  Chips,
+  Confirmacao,
+  EstadoVazio,
+  Secao,
+  Segmentado,
+} from '../../ui/pagina'
+import { Icone } from '../../ui/icones'
 import { quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
+type Visao = 'CARTOES' | 'TABELA'
+type Filtro = 'TODOS' | Papel | 'INATIVOS'
+
 /**
- * Quadro de membros e convites — a tela do presidente.
+ * Quadro de membros e convites.
  *
  * <p>Convidar é atribuição de PRESIDENTE, e não de diretor, porque quem
  * controla a entrada controla a atlética. É a mesma regra escrita no
  * comentário de `membro.papel` na migration.</p>
+ *
+ * <p>Quem saiu continua listado: as inscrições e os resultados que essa
+ * pessoa produziu precisam apontar para um vínculo que existe. Apagar
+ * membro apagaria história.</p>
  */
 export function Membros() {
   const { slug = '' } = useParams()
-  const { vinculo } = useSessao()
-  useCorDaAtletica(vinculo(slug)?.atletica.corPrimaria)
+  const [parametros] = useSearchParams()
+  const { podeAtuarComo } = useSessao()
+  const presidente = podeAtuarComo(slug, 'PRESIDENTE')
+
+  const [visao, setVisao] = useState<Visao>('CARTOES')
+  const [filtro, setFiltro] = useState<Filtro>('TODOS')
+  const [termo, setTermo] = useState('')
+  const [convidando, setConvidando] = useState(parametros.get('convidar') === '1')
 
   const membros = useBusca<MembroDto[]>(() => Dados.membros(slug), [slug])
   const convites = useBusca<Convite[]>(() => Dados.convites(slug), [slug])
 
-  const ativos = membros.dados?.filter((m) => m.situacao === 'ATIVO') ?? []
-  const inativos = membros.dados?.filter((m) => m.situacao !== 'ATIVO') ?? []
-
   return (
-    <div className="pilha" style={{ gap: '1.6rem' }}>
-      <header>
-        <h1>Membros</h1>
-        <p className="fraco" style={{ margin: 0 }}>
-          Papel mora no vínculo, não na pessoa: a mesma conta pode presidir
-          aqui e ser membro comum em outra atlética.
-        </p>
-      </header>
-
-      <FormularioDeConvite
-        slug={slug}
-        aoConvidar={(convite) => convites.definir([convite, ...(convites.dados ?? [])])}
+    <div>
+      <CabecalhoDePagina
+        titulo="Membros"
+        descricao="Papel mora no vínculo, não na pessoa: a mesma conta pode presidir aqui e ser membro comum em outra atlética."
+        acoes={
+          <>
+            <Segmentado
+              rotulo="Forma de ver os membros"
+              atual={visao}
+              aoTrocar={setVisao}
+              opcoes={[
+                { valor: 'CARTOES', rotulo: 'Cartões', icone: 'grade' },
+                { valor: 'TABELA', rotulo: 'Tabela', icone: 'lista' },
+              ]}
+            />
+            {presidente ? (
+              <button className="botao" onClick={() => setConvidando((v) => !v)}>
+                <Icone nome="mais" tamanho={16} /> Convidar
+              </button>
+            ) : null}
+          </>
+        }
       />
 
+      {convidando && presidente ? (
+        <FormularioDeConvite
+          slug={slug}
+          aoConvidar={(convite) => convites.definir([convite, ...(convites.dados ?? [])])}
+          aoFechar={() => setConvidando(false)}
+        />
+      ) : null}
+
       {convites.dados && convites.dados.length > 0 ? (
-        <section>
-          <div className="cabecalho-de-secao">
-            <h2>Convites pendentes</h2>
-          </div>
+        <Secao
+          titulo="Convites pendentes"
+          descricao="Cada convite é endereçado a um e-mail. Só quem entrar com ele consegue aceitar."
+        >
           <div className="pilha pilha--densa">
             {convites.dados.map((convite) => (
-              <div key={convite.id} className="cartao linha entre">
+              <div key={convite.id} className="cartao cartao--compacto linha entre">
                 <div style={{ minWidth: 0 }}>
                   <strong>{convite.email}</strong>
                   <div className="fraco">
                     {rotuloDoPapel(convite.papel)} · expira {quando(convite.expiraEm)}
                   </div>
                 </div>
-                <button
-                  className="botao botao--perigo botao--pequeno"
-                  onClick={() => {
-                    void Dados.revogarConvite(slug, convite.id)
-                    convites.definir(
-                      (convites.dados ?? []).filter((c) => c.id !== convite.id))
-                  }}
-                >
-                  Revogar
-                </button>
+                {presidente ? (
+                  <button
+                    className="botao botao--perigo botao--pequeno"
+                    onClick={() => {
+                      void Dados.revogarConvite(slug, convite.id)
+                      convites.definir(
+                        (convites.dados ?? []).filter((c) => c.id !== convite.id))
+                    }}
+                  >
+                    Revogar
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
-        </section>
+        </Secao>
       ) : null}
 
-      <section>
-        <div className="cabecalho-de-secao">
-          <h2>Quadro atual</h2>
-          <span className="fraco">{ativos.length} ativos</span>
-        </div>
+      <Conteudo busca={membros} esqueleto={<Esqueleto altura="16rem" />}>
+        {(lista) => {
+          const ativos = lista.filter((m) => m.situacao === 'ATIVO')
+          const inativos = lista.filter((m) => m.situacao !== 'ATIVO')
+          const alvo = termo.trim().toLowerCase()
 
-        <Conteudo busca={membros} esqueleto={<Esqueleto altura="12rem" />}>
-          {() =>
-            ativos.length === 0 ? (
-              <Vazio titulo="Nenhum membro ativo" />
-            ) : (
-              <div className="pilha pilha--densa">
-                {ativos.map((membro) => (
-                  <LinhaDeMembro
-                    key={membro.id}
-                    slug={slug}
-                    membro={membro}
-                    presidentesAtivos={ativos.filter((m) => m.papel === 'PRESIDENTE').length}
-                    aoMudar={membros.recarregar}
-                  />
-                ))}
+          const base = filtro === 'INATIVOS' ? inativos
+            : filtro === 'TODOS' ? ativos
+            : ativos.filter((m) => m.papel === filtro)
+
+          const visiveis = base.filter((m) => alvo === '' ||
+            `${m.nome} ${m.email} ${m.cargo ?? ''}`.toLowerCase().includes(alvo))
+
+          const contar = (p: Papel) => ativos.filter((m) => m.papel === p).length
+          const presidentesAtivos = contar('PRESIDENTE')
+
+          return (
+            <>
+              <div className="grade grade--metricas" style={{ marginBottom: '1.4rem' }}>
+                <Metrica rotulo="Membros ativos" icone="membros" valor={ativos.length} />
+                <Metrica rotulo="Diretoria" icone="diretoria"
+                         valor={contar('PRESIDENTE') + contar('DIRETOR')}
+                         para={`/hub/${slug}/diretoria`} />
+                <Metrica rotulo="Convites abertos" icone="inscricoes"
+                         valor={convites.dados?.length ?? 0} />
+                <Metrica rotulo="No histórico" icone="historico" valor={inativos.length}
+                         detalhe="quem já passou pela atlética" />
               </div>
-            )
-          }
-        </Conteudo>
-      </section>
 
-      {inativos.length > 0 ? (
-        <section>
-          <div className="cabecalho-de-secao">
-            <h2>Histórico</h2>
-          </div>
-          <p className="fraco">
-            Quem saiu continua aqui: as inscrições e os resultados que essa
-            pessoa produziu precisam apontar para um vínculo que existe.
-          </p>
-          <div className="pilha pilha--densa">
-            {inativos.map((membro) => (
-              <div key={membro.id} className="cartao linha" style={{ opacity: 0.65 }}>
-                <Avatar nome={membro.nome} url={membro.avatarUrl} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span>{membro.nome}</span>
-                  <div className="fraco">
-                    saiu {membro.saiuEm ? quando(membro.saiuEm) : ''}
+              <div className="barra-de-filtros">
+                <input
+                  type="search"
+                  value={termo}
+                  onChange={(e) => setTermo(e.target.value)}
+                  placeholder="Buscar por nome, cargo ou e-mail"
+                  aria-label="Buscar membros"
+                />
+                <Chips
+                  rotulo="Filtros de membro"
+                  selecionado={filtro}
+                  aoSelecionar={setFiltro}
+                  opcoes={[
+                    { valor: 'TODOS', rotulo: 'Ativos', contagem: ativos.length },
+                    { valor: 'PRESIDENTE', rotulo: 'Presidência',
+                      contagem: contar('PRESIDENTE') },
+                    { valor: 'DIRETOR', rotulo: 'Diretoria', contagem: contar('DIRETOR') },
+                    { valor: 'MEMBRO', rotulo: 'Membros', contagem: contar('MEMBRO') },
+                    { valor: 'INATIVOS', rotulo: 'Histórico', contagem: inativos.length },
+                  ]}
+                />
+              </div>
+
+              {visiveis.length === 0 ? (
+                <EstadoVazio icone="membros" titulo="Ninguém neste filtro">
+                  <p className="fraco">
+                    {filtro === 'INATIVOS'
+                      ? 'Ninguém saiu da atlética ainda.'
+                      : 'Ajuste a busca ou convide alguém para começar.'}
+                  </p>
+                </EstadoVazio>
+              ) : visao === 'CARTOES' ? (
+                <Secao>
+                  <div className="grade">
+                    {visiveis.map((membro) => (
+                      <CartaoDeMembro
+                        key={membro.id}
+                        slug={slug}
+                        membro={membro}
+                        podeGerenciar={presidente && membro.situacao === 'ATIVO'}
+                        presidentesAtivos={presidentesAtivos}
+                        aoMudar={membros.recarregar}
+                      />
+                    ))}
                   </div>
+                </Secao>
+              ) : (
+                <Secao>
+                  <div className="rolagem">
+                    <table className="tabela-cartoes">
+                      <thead>
+                        <tr>
+                          <th>Membro</th>
+                          <th>Cargo</th>
+                          <th>Papel</th>
+                          <th>Desde</th>
+                          <th>Situação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visiveis.map((m) => (
+                          <tr key={m.id}>
+                            <td data-rotulo="Membro">
+                              <div style={{ fontWeight: 550 }}>{m.nome}</div>
+                              <div className="fraco">{m.email}</div>
+                            </td>
+                            <td data-rotulo="Cargo">{m.cargo ?? '—'}</td>
+                            <td data-rotulo="Papel">
+                              <span className={`etiqueta ${
+                                m.papel === 'PRESIDENTE' ? 'etiqueta--acento' : ''}`}>
+                                {rotuloDoPapel(m.papel)}
+                              </span>
+                            </td>
+                            <td data-rotulo="Desde">{quando(m.entrouEm)}</td>
+                            <td data-rotulo="Situação">
+                              {m.situacao === 'ATIVO' ? (
+                                <span className="etiqueta etiqueta--sucesso">ativo</span>
+                              ) : (
+                                <span className="etiqueta">
+                                  saiu {m.saiuEm ? quando(m.saiuEm) : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Secao>
+              )}
+
+              {filtro === 'INATIVOS' ? (
+                <div className="aviso" style={{ marginTop: '1.2rem' }}>
+                  <strong>Por que quem saiu continua aqui</strong>
+                  <p className="fraco" style={{ margin: '0.25rem 0 0' }}>
+                    As inscrições e os resultados que essa pessoa produziu precisam
+                    apontar para um vínculo que existe. Apagar membro apagaria
+                    história — o desligamento marca a saída sem destruir o passado.
+                  </p>
                 </div>
-                <span className="etiqueta">inativo</span>
-              </div>
-            ))}
+              ) : null}
+            </>
+          )
+        }}
+      </Conteudo>
+    </div>
+  )
+}
+
+function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMudar }: {
+  slug: string
+  membro: MembroDto
+  podeGerenciar: boolean
+  presidentesAtivos: number
+  aoMudar: () => void
+}) {
+  const [ocupado, setOcupado] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+
+  // Trava do último presidente: uma atlética sem presidência ativa não tem
+  // quem convide nem quem promova, e precisaria de intervenção no banco para
+  // voltar a funcionar. O servidor recusa; a interface nem oferece.
+  const ultimoPresidente = membro.papel === 'PRESIDENTE' && presidentesAtivos <= 1
+
+  async function alterar(papel: Papel) {
+    setOcupado(true)
+    await Dados.alterarPapel(slug, membro.id, papel)
+    setOcupado(false)
+    aoMudar()
+  }
+
+  async function desligar() {
+    setOcupado(true)
+    await Dados.desligarMembro(slug, membro.id)
+    setOcupado(false)
+    aoMudar()
+  }
+
+  return (
+    <div className="cartao" style={membro.situacao === 'ATIVO' ? undefined : { opacity: 0.65 }}>
+      <div className="linha linha--topo" style={{ marginBottom: '0.8rem' }}>
+        <Avatar nome={membro.nome} url={membro.avatarUrl} tamanho="m" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong>{membro.nome}</strong>
+          <div className="fraco">{membro.cargo ?? rotuloDoPapel(membro.papel)}</div>
+          <div className="fraco">
+            {membro.situacao === 'ATIVO'
+              ? `desde ${quando(membro.entrouEm)}`
+              : `saiu ${membro.saiuEm ? quando(membro.saiuEm) : ''}`}
           </div>
-        </section>
+        </div>
+        <span className={`etiqueta ${
+          membro.papel === 'PRESIDENTE' ? 'etiqueta--acento' : ''}`}>
+          {rotuloDoPapel(membro.papel)}
+        </span>
+      </div>
+
+      {podeGerenciar ? (
+        <div className="linha">
+          <select
+            value={membro.papel}
+            disabled={ocupado || ultimoPresidente}
+            onChange={(e) => void alterar(e.target.value as Papel)}
+            aria-label={`Papel de ${membro.nome}`}
+            title={ultimoPresidente
+              ? 'Promova outra pessoa a presidente antes de rebaixar esta'
+              : undefined}
+            style={{ flex: 1, minWidth: '8rem', minHeight: '38px' }}
+          >
+            <option value="MEMBRO">Membro</option>
+            <option value="DIRETOR">Diretor</option>
+            <option value="PRESIDENTE">Presidente</option>
+          </select>
+
+          <button
+            className="botao botao--perigo botao--pequeno"
+            disabled={ocupado || ultimoPresidente}
+            onClick={() => setConfirmando(true)}
+            title={ultimoPresidente
+              ? 'Esta é a única presidência ativa da atlética'
+              : undefined}
+          >
+            Desligar
+          </button>
+        </div>
+      ) : null}
+
+      {confirmando ? (
+        <Confirmacao
+          titulo={`Desligar ${membro.nome} da atlética?`}
+          consequencia={
+            'A pessoa perde acesso à área da diretoria, mas continua no histórico: '
+            + 'as inscrições e os resultados que ela produziu precisam apontar para '
+            + 'um vínculo que existe.'
+          }
+          rotuloDeConfirmar="Desligar"
+          aoConfirmar={() => { setConfirmando(false); void desligar() }}
+          aoCancelar={() => setConfirmando(false)}
+        />
       ) : null}
     </div>
   )
 }
 
-function FormularioDeConvite({ slug, aoConvidar }: {
+function FormularioDeConvite({ slug, aoConvidar, aoFechar }: {
   slug: string
   aoConvidar: (convite: Convite) => void
+  aoFechar: () => void
 }) {
   const [email, setEmail] = useState('')
   const [papel, setPapel] = useState<Papel>('MEMBRO')
@@ -153,11 +369,17 @@ function FormularioDeConvite({ slug, aoConvidar }: {
   }
 
   return (
-    <section className="cartao">
-      <h3>Convidar</h3>
+    <section className="cartao" style={{ marginBottom: '1.4rem' }}>
+      <div className="linha entre" style={{ marginBottom: '0.4rem' }}>
+        <h3 style={{ margin: 0 }}>Convidar</h3>
+        <button className="icone-botao" onClick={aoFechar} aria-label="Fechar">
+          <Icone nome="fechar" tamanho={17} />
+        </button>
+      </div>
+
       <p className="fraco">
         O convite é endereçado a este e-mail. Só quem entrar com ele consegue
-        aceitar. É o que impede um link encaminhado no grupo de matricular o
+        aceitar — é o que impede um link encaminhado no grupo de matricular o
         grupo inteiro.
       </p>
 
@@ -194,74 +416,5 @@ function FormularioDeConvite({ slug, aoConvidar }: {
         </div>
       </form>
     </section>
-  )
-}
-
-function LinhaDeMembro({ slug, membro, presidentesAtivos, aoMudar }: {
-  slug: string
-  membro: MembroDto
-  presidentesAtivos: number
-  aoMudar: () => void
-}) {
-  const [ocupado, setOcupado] = useState(false)
-
-  // Trava do último presidente: uma atlética sem presidência ativa não tem
-  // quem convide nem quem promova, e precisaria de intervenção no banco para
-  // voltar a funcionar. O servidor recusa; a interface nem oferece.
-  const ultimoPresidente = membro.papel === 'PRESIDENTE' && presidentesAtivos <= 1
-
-  async function alterar(papel: Papel) {
-    setOcupado(true)
-    await Dados.alterarPapel(slug, membro.id, papel)
-    setOcupado(false)
-    aoMudar()
-  }
-
-  async function desligar() {
-    if (!window.confirm(`Desligar ${membro.nome} da atlética?`)) return
-    setOcupado(true)
-    await Dados.desligarMembro(slug, membro.id)
-    setOcupado(false)
-    aoMudar()
-  }
-
-  return (
-    <div className="cartao linha entre">
-      <div className="linha" style={{ minWidth: 0, flex: 1 }}>
-        <Avatar nome={membro.nome} url={membro.avatarUrl} />
-        <div style={{ minWidth: 0 }}>
-          <strong>{membro.nome}</strong>
-          <div className="fraco">{membro.cargo ?? membro.email}</div>
-        </div>
-      </div>
-
-      <div className="linha">
-        <select
-          value={membro.papel}
-          disabled={ocupado || ultimoPresidente}
-          onChange={(e) => void alterar(e.target.value as Papel)}
-          aria-label={`Papel de ${membro.nome}`}
-          title={ultimoPresidente
-            ? 'Promova outra pessoa a presidente antes de rebaixar esta'
-            : undefined}
-          style={{ width: 'auto', minWidth: '8rem' }}
-        >
-          <option value="MEMBRO">Membro</option>
-          <option value="DIRETOR">Diretor</option>
-          <option value="PRESIDENTE">Presidente</option>
-        </select>
-
-        <button
-          className="botao botao--perigo botao--pequeno"
-          disabled={ocupado || ultimoPresidente}
-          onClick={() => void desligar()}
-          title={ultimoPresidente
-            ? 'Esta é a única presidência ativa da atlética'
-            : undefined}
-        >
-          Desligar
-        </button>
-      </div>
-    </div>
   )
 }
