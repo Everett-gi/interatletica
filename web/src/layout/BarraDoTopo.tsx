@@ -6,7 +6,7 @@ import { sair as sairDaSessao } from '../api/cliente'
 import { useSessao } from '../sessao/SessaoContexto'
 import { Avatar, Brasao, useBusca } from '../ui/componentes'
 import { Icone, type NomeDoIcone } from '../ui/icones'
-import { Gaveta } from '../ui/pagina'
+import { Confirmacao, Gaveta } from '../ui/pagina'
 import { quando } from '../formatos'
 import { PesquisaGlobal } from './PesquisaGlobal'
 import { ACOES_RAPIDAS } from './navegacao'
@@ -202,8 +202,8 @@ function MenuDeCriacao({ slug }: { slug: string }) {
 
 function MenuDoPerfil() {
   const { perfil, aparencia, trocarAparencia } = useSessao()
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false)
   const menu = useMenu<HTMLDivElement>()
-  const navegar = useNavigate()
 
   if (!perfil) return null
 
@@ -264,7 +264,7 @@ function MenuDoPerfil() {
             onClick={() => {
               menu.fechar()
               if (MODO_DEMO) {
-                void Dados.sairDemo().then(() => navegar('/', { replace: true }))
+                setConfirmandoSaida(true)
               } else {
                 void sairDaSessao()
               }
@@ -276,6 +276,28 @@ function MenuDoPerfil() {
             </span>
           </button>
         </div>
+      ) : null}
+
+      {/* Na demonstração não há senha, então sair é irreversível: não existe
+          como entrar de novo na conta que existia. Confirmar aqui é o §77 —
+          ação destrutiva avisa antes, dizendo a consequência. */}
+      {confirmandoSaida ? (
+        <Confirmacao
+          titulo="Sair e descartar esta demonstração?"
+          consequencia={
+            'A atlética que você criou vive só neste navegador e não tem senha '
+            + 'para voltar a entrar. Sair apaga tudo o que você montou aqui.'
+          }
+          rotuloDeConfirmar="Sair e descartar"
+          aoConfirmar={() => {
+            setConfirmandoSaida(false)
+            // Recarga de verdade, e não navegação do router: a sessão vive
+            // também no contexto de React, e trocar de rota com ela em memória
+            // levaria de volta a um hub cuja atlética acabou de ser apagada.
+            void Dados.recomecarDemo().then(() => window.location.replace('/'))
+          }}
+          aoCancelar={() => setConfirmandoSaida(false)}
+        />
       ) : null}
     </div>
   )

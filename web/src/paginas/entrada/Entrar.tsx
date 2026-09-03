@@ -54,8 +54,8 @@ export function Entrar() {
               <strong>Esta é a demonstração</strong>
               <p className="fraco" style={{ margin: '0.25rem 0 0' }}>
                 O login do Google não funciona aqui. Informe um nome e um e-mail
-                para criar uma sessão local — nada é enviado a lugar nenhum e
-                tudo some ao recarregar a página.
+                para criar uma sessão local — nada é enviado a servidor nenhum,
+                e o que você criar fica guardado neste navegador.
               </p>
             </div>
 
@@ -94,6 +94,8 @@ export function Entrar() {
             <p className="fraco" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
               Entra como presidente de uma atlética fictícia com dois anos de
               história — útil para ver a plataforma cheia, sem preencher nada.
+              Esta não fica guardada: abre igual todas as vezes, que é o que
+              uma demonstração de apresentação precisa fazer.
             </p>
           </>
         ) : (

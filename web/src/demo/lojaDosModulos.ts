@@ -34,6 +34,7 @@ import type {
 } from '../api/tipos-financeiro'
 import type { Atleta, Jogo, LinhaDeArtilharia, Viagem } from '../api/tipos-esportes'
 import type {
+  AreaDeConhecimento,
   Comunidade,
   Experiencia,
   Guia,
@@ -85,6 +86,7 @@ import {
   PATROCINIOS,
   PRESTACOES,
   ROTULO_DO_MES,
+  competenciaPorExtenso,
 } from './financeiro'
 import { ARTILHARIA, ATLETAS, JOGOS, VIAGENS } from './esportes'
 import { EXPERIENCIAS, GUIAS, MODELOS } from './conhecimento'
@@ -153,6 +155,7 @@ interface Estado {
   amistosos: Amistoso[]
   noticias: Noticia[]
   campanhas: Campanha[]
+  experiencias: Experiencia[]
   notificacoes: Notificacao[]
   onboarding: PassoDeOnboarding[]
 }
@@ -175,6 +178,7 @@ const estado: Estado = {
   amistosos: clonar(AMISTOSOS),
   noticias: clonar(NOTICIAS),
   campanhas: clonar(CAMPANHAS),
+  experiencias: clonar(EXPERIENCIAS),
   notificacoes: clonar(NOTIFICACOES),
   onboarding: clonar(PASSOS_DE_ONBOARDING),
 }
@@ -185,6 +189,35 @@ function novoId(prefixo: string): string {
 
 const daAtletica = <T extends { atleticaSlug: string }>(lista: T[], slug: string) =>
   lista.filter((item) => item.atleticaSlug === slug)
+
+/** "2026-09" vira "Setembro de 2026" — inclusive para meses fora da semente. */
+function rotuloDaCompetencia(competencia: string): string {
+  const [ano, mes] = competencia.split('-').map(Number)
+  if (!ano || !mes) return competencia
+  const nome = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
+    .format(new Date(ano, mes - 1, 15))
+  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`
+}
+
+function somarPorNatureza(lista: Lancamento[]): { receitas: number; despesas: number } {
+  const somar = (natureza: Lancamento['natureza']) => lista
+    .filter((l) => l.natureza === natureza)
+    .reduce((s, l) => s + l.valor, 0)
+  return { receitas: somar('RECEITA'), despesas: somar('DESPESA') }
+}
+
+/** Igual a `loja.ts`: quem avisa que o estado mudou, sem fechar ciclo. */
+let notificarMudanca: () => void = () => {}
+
+export function observarMudancasDosModulos(fn: () => void): void {
+  notificarMudanca = fn
+}
+
+/** Resposta de uma operação que ALTERA o estado: agenda a gravação. */
+function responderMudanca<T>(valor: T, ms = 160): Promise<T> {
+  notificarMudanca()
+  return responder(valor, ms)
+}
 
 // =====================================================================
 // Financeiro derivado
@@ -259,6 +292,181 @@ function resumirFinanceiro(slug: string): ResumoFinanceiro {
 }
 
 // =====================================================================
+// Persistência: registros meus, e os marcadores pessoais na rede
+// =====================================================================
+
+export interface FatiaDosModulos {
+  projetos: unknown[]
+  metas: unknown[]
+  reunioes: unknown[]
+  decisoes: unknown[]
+  documentos: unknown[]
+  patrimonio: unknown[]
+  lancamentos: unknown[]
+  prestacoes: unknown[]
+  patrocinios: unknown[]
+  noticias: unknown[]
+  campanhas: unknown[]
+  /** Experiências que a minha atlética publicou na rede. */
+  minhasExperiencias: unknown[]
+  /** Pedidos que a minha atlética abriu. */
+  meusPedidos: unknown[]
+  /** Respostas minhas em pedidos de outras atléticas: `{ pedidoId: resposta[] }`. */
+  respostasEmOutros: Record<string, unknown[]>
+  /** Marcadores pessoais espalhados pelo conteúdo compartilhado. */
+  comunidadesQueParticipo: string[]
+  parceriasComInteresse: string[]
+  amistososComInteresse: string[]
+  comprasQueParticipo: { id: string; quantidade: number }[]
+  votos: Record<string, string>
+  notificacoesLidas: string[]
+  itensDaTransicaoConcluidos: string[]
+}
+
+/**
+ * O que destes módulos pertence a quem está usando.
+ *
+ * <p>Dois tipos de coisa. Os <strong>registros</strong> — projeto, lançamento,
+ * decisão — são meus quando o `atleticaSlug` é meu. Os <strong>marcadores
+ * pessoais</strong> vivem em conteúdo compartilhado: a comunidade é da rede,
+ * mas "eu participo" é meu. Guardar a comunidade inteira congelaria o número
+ * de membros dela; guardar só o marcador preserva as duas coisas.</p>
+ */
+export function exportarFatiaDosModulos(meus: Set<string>): FatiaDosModulos {
+  const daMinha = <T extends { atleticaSlug: string }>(lista: T[]) =>
+    lista.filter((item) => meus.has(item.atleticaSlug))
+
+  return {
+    projetos: daMinha(estado.projetos),
+    metas: daMinha(estado.metas),
+    reunioes: daMinha(estado.reunioes),
+    decisoes: daMinha(estado.decisoes),
+    documentos: daMinha(estado.documentos),
+    patrimonio: daMinha(estado.patrimonio),
+    lancamentos: daMinha(estado.lancamentos),
+    prestacoes: daMinha(estado.prestacoes),
+    patrocinios: daMinha(estado.patrocinios),
+    noticias: daMinha(estado.noticias),
+    campanhas: daMinha(estado.campanhas),
+    minhasExperiencias: estado.experiencias.filter((e) => meus.has(e.atletica.slug)),
+
+    meusPedidos: estado.pedidos.filter((p) => meus.has(p.atletica.slug)),
+    respostasEmOutros: Object.fromEntries(
+      estado.pedidos
+        .filter((p) => !meus.has(p.atletica.slug))
+        .map((p) => [
+          p.id,
+          p.respostas.filter((r) => r.atletica !== null && meus.has(r.atletica.slug)),
+        ])
+        .filter(([, respostas]) => (respostas as unknown[]).length > 0)),
+
+    comunidadesQueParticipo: estado.comunidades.filter((c) => c.participo).map((c) => c.id),
+    parceriasComInteresse: estado.parcerias.filter((p) => p.tenhoInteresse).map((p) => p.id),
+    amistososComInteresse: estado.amistosos.filter((a) => a.tenhoInteresse).map((a) => a.id),
+    comprasQueParticipo: estado.compras
+      .filter((c) => c.participo)
+      .map((c) => ({
+        id: c.id,
+        quantidade: c.interessados.find((i) => meus.has(i.atletica.slug))?.quantidade ?? 0,
+      })),
+    votos: Object.fromEntries(
+      estado.decisoes
+        .filter((d) => d.meuVoto !== null)
+        .map((d) => [d.id, d.meuVoto as string])),
+    notificacoesLidas: estado.notificacoes.filter((n) => n.lida).map((n) => n.id),
+    itensDaTransicaoConcluidos: estado.transicao.itens
+      .filter((i) => i.concluido).map((i) => i.id),
+  }
+}
+
+/** Recoloca a fatia por cima da semente recém-carregada. */
+export function importarFatiaDosModulos(
+  fatia: Partial<FatiaDosModulos>,
+  minhas: AtleticaResumo[],
+): void {
+  // A semente traz marcadores pessoais ligados — a demonstração preenchida
+  // precisa deles. Quem volta com uma conta própria não herda nada disso:
+  // a participação de verdade dessa pessoa está na fatia, e só nela. Sem
+  // zerar antes, recarregar marcaria "entre numa comunidade" como feito.
+  lojaDosModulos.zerarEstadoPessoal()
+  estado.projetos.push(...(fatia.projetos ?? []) as Projeto[])
+  estado.metas.push(...(fatia.metas ?? []) as Meta[])
+  estado.reunioes.push(...(fatia.reunioes ?? []) as Reuniao[])
+  estado.decisoes.push(...(fatia.decisoes ?? []) as Decisao[])
+  estado.documentos.push(...(fatia.documentos ?? []) as Documento[])
+  estado.patrimonio.push(...(fatia.patrimonio ?? []) as ItemDePatrimonio[])
+  estado.lancamentos.push(...(fatia.lancamentos ?? []) as Lancamento[])
+  estado.prestacoes.push(...(fatia.prestacoes ?? []) as PrestacaoDeContas[])
+  estado.patrocinios.push(...(fatia.patrocinios ?? []) as Patrocinio[])
+  estado.noticias.push(...(fatia.noticias ?? []) as Noticia[])
+  estado.campanhas.push(...(fatia.campanhas ?? []) as Campanha[])
+  estado.experiencias.unshift(...(fatia.minhasExperiencias ?? []) as Experiencia[])
+  estado.pedidos.unshift(...(fatia.meusPedidos ?? []) as PedidoDeAjuda[])
+
+  Object.entries(fatia.respostasEmOutros ?? {}).forEach(([pedidoId, respostas]) => {
+    const pedido = estado.pedidos.find((p) => p.id === pedidoId)
+    if (pedido) {
+      pedido.respostas.push(...respostas as PedidoDeAjuda['respostas'])
+      pedido.status = 'RESPONDIDO'
+    }
+  })
+
+  // Os marcadores pessoais são reaplicados como se a pessoa tivesse clicado
+  // de novo — inclusive somando membro e quantidade, para os números da rede
+  // baterem com o que ela vê.
+  const marcar = <T extends { id: string }>(lista: T[], ids: string[] | undefined,
+                                            aplicar: (item: T) => void) => {
+    (ids ?? []).forEach((id) => {
+      const item = lista.find((x) => x.id === id)
+      if (item) aplicar(item)
+    })
+  }
+
+  marcar(estado.comunidades, fatia.comunidadesQueParticipo, (c) => {
+    c.participo = true
+    c.membros += 1
+  })
+  marcar(estado.parcerias, fatia.parceriasComInteresse, (p) => {
+    p.tenhoInteresse = true
+    if (minhas[0] && !p.interessadas.some((a) => a.slug === minhas[0].slug)) {
+      p.interessadas = [...p.interessadas, minhas[0]]
+    }
+    if (p.etapa === 'DISPONIVEL') p.etapa = 'INTERESSE'
+  })
+  marcar(estado.amistosos, fatia.amistososComInteresse, (a) => {
+    a.tenhoInteresse = true
+    if (minhas[0] && !a.interessadas.some((x) => x.slug === minhas[0].slug)) {
+      a.interessadas = [...a.interessadas, minhas[0]]
+    }
+  })
+  marcar(estado.notificacoes, fatia.notificacoesLidas, (n) => { n.lida = true })
+  marcar(estado.transicao.itens, fatia.itensDaTransicaoConcluidos,
+    (i) => { i.concluido = true })
+
+  ;(fatia.comprasQueParticipo ?? []).forEach(({ id, quantidade }) => {
+    const compra = estado.compras.find((c) => c.id === id)
+    if (compra && minhas[0]) {
+      compra.participo = true
+      compra.interessados = [
+        ...compra.interessados.filter((i) => i.atletica.slug !== minhas[0].slug),
+        { atletica: minhas[0], quantidade, confirmado: true },
+      ]
+      compra.quantidadeAtual = compra.interessados.reduce((s, i) => s + i.quantidade, 0)
+    }
+  })
+
+  Object.entries(fatia.votos ?? {}).forEach(([decisaoId, opcaoId]) => {
+    const decisao = estado.decisoes.find((d) => d.id === decisaoId)
+    const opcao = decisao?.opcoes.find((o) => o.id === opcaoId)
+    if (decisao && opcao && decisao.meuVoto === null) {
+      opcao.votos += 1
+      decisao.votantes += 1
+      decisao.meuVoto = opcaoId
+    }
+  })
+}
+
+// =====================================================================
 // Busca global
 // =====================================================================
 
@@ -320,7 +528,7 @@ function indexar(contextoSlug: string): ResultadoDeBusca[] {
     destino: `${base}/conhecimento/guias/${g.id}`, noContexto: false,
   }))
 
-  EXPERIENCIAS.forEach((e) => itens.push({
+  estado.experiencias.forEach((e) => itens.push({
     id: `bex-${e.id}`, tipo: 'POST', titulo: e.titulo,
     detalhe: `${e.atletica.nome} · ${e.quando}`,
     destino: `${base}/conhecimento/experiencias/${e.id}`,
@@ -435,10 +643,51 @@ export const lojaDosModulos = {
       resultado: null,
     }
     estado.projetos.unshift(projeto)
-    return responder(projeto)
+    return responderMudanca(projeto)
   },
 
   metas: (slug: string): Promise<Meta[]> => responder(daAtletica(estado.metas, slug)),
+
+  /**
+   * Uma meta da gestão (§20).
+   *
+   * <p>Alvo e unidade são obrigatórios porque meta sem número é intenção:
+   * "melhorar a comunicação" não fecha o ano nem prova nada na transição.</p>
+   */
+  criarMeta(slug: string, dados: {
+    titulo: string
+    area: string
+    alvo: number
+    unidade: string
+    prazo: string | null
+  }): Promise<Meta> {
+    const meta: Meta = {
+      id: novoId('mt'),
+      atleticaSlug: slug,
+      gestaoAno: new Date().getFullYear(),
+      titulo: dados.titulo,
+      area: dados.area,
+      alvo: dados.alvo,
+      atual: 0,
+      unidade: dados.unidade,
+      prazo: dados.prazo,
+    }
+    estado.metas.push(meta)
+    return responderMudanca(meta)
+  },
+
+  /** O acompanhamento é manual de propósito: número que se move sozinho ninguém confere. */
+  atualizarProgressoDaMeta(id: string, atual: number): Promise<Meta | null> {
+    const meta = estado.metas.find((m) => m.id === id)
+    if (meta) meta.atual = Math.max(0, atual)
+    return responderMudanca(meta ?? null, 80)
+  },
+
+  excluirMeta(id: string): Promise<void> {
+    const i = estado.metas.findIndex((m) => m.id === id)
+    if (i >= 0) estado.metas.splice(i, 1)
+    return responderMudanca(undefined, 80)
+  },
 
   reunioes: (slug: string): Promise<Reuniao[]> =>
     responder(daAtletica(estado.reunioes, slug)),
@@ -446,17 +695,136 @@ export const lojaDosModulos = {
   reuniao: (id: string): Promise<Reuniao | null> =>
     responder(estado.reunioes.find((r) => r.id === id) ?? null),
 
+  /**
+   * Agendar uma reunião com pauta (§21).
+   *
+   * <p>A pauta entra no agendamento, não na hora. Reunião cuja pauta se
+   * descobre na sala é a reunião que termina sem decisão — que é o problema
+   * que este módulo existe para resolver.</p>
+   */
+  agendarReuniao(slug: string, dados: {
+    titulo: string
+    inicioEm: string
+    duracaoEmMinutos: number
+    local: string | null
+    linkOnline: string | null
+    pautas: string[]
+    convocados: { nome: string; avatarUrl: string | null }[]
+  }): Promise<Reuniao> {
+    const pautas = dados.pautas.filter((p) => p.trim() !== '')
+    const reuniao: Reuniao = {
+      id: novoId('re'),
+      atleticaSlug: slug,
+      titulo: dados.titulo,
+      inicioEm: dados.inicioEm,
+      duracaoEmMinutos: dados.duracaoEmMinutos,
+      local: dados.local,
+      linkOnline: dados.linkOnline,
+      status: 'AGENDADA',
+      convocados: dados.convocados.map((c) => ({ ...c, confirmado: false })),
+      pautas: pautas.map((titulo) => ({
+        id: novoId('pa'), titulo, responsavel: null,
+        minutos: Math.max(5, Math.round(dados.duracaoEmMinutos / pautas.length)),
+        decisaoId: null,
+      })),
+      ata: null,
+      tarefasGeradas: 0,
+      documentos: [],
+    }
+    estado.reunioes.unshift(reuniao)
+    return responderMudanca(reuniao)
+  },
+
+  /** Escrever a ata é o que encerra a reunião — sem ata ela fica aberta. */
+  registrarAta(id: string, ata: string): Promise<Reuniao | null> {
+    const reuniao = estado.reunioes.find((r) => r.id === id)
+    if (reuniao) {
+      reuniao.ata = ata
+      reuniao.status = 'REALIZADA'
+    }
+    return responderMudanca(reuniao ?? null)
+  },
+
+  confirmarPresenca(id: string, nome: string): Promise<Reuniao | null> {
+    const reuniao = estado.reunioes.find((r) => r.id === id)
+    const convocado = reuniao?.convocados.find((c) => c.nome === nome)
+    if (convocado) convocado.confirmado = !convocado.confirmado
+    return responderMudanca(reuniao ?? null, 80)
+  },
+
   decisoes: (slug: string): Promise<Decisao[]> =>
     responder(daAtletica(estado.decisoes, slug)),
 
   decisao: (id: string): Promise<Decisao | null> =>
     responder(estado.decisoes.find((d) => d.id === id) ?? null),
 
+  /**
+   * Abrir uma decisão para votação (§22).
+   *
+   * <p>Nasce já em votação: rascunho de decisão é decisão que ninguém toma.
+   * O quórum é declarado na abertura para não ser ajustado depois em função
+   * do resultado.</p>
+   */
+  abrirDecisao(slug: string, dados: {
+    titulo: string
+    contexto: string
+    opcoes: string[]
+    quorum: number
+    fechaEm: string | null
+    reuniaoId?: string | null
+  }): Promise<Decisao> {
+    const reuniao = dados.reuniaoId
+      ? estado.reunioes.find((r) => r.id === dados.reuniaoId) ?? null
+      : null
+    const decisao: Decisao = {
+      id: novoId('dc'),
+      atleticaSlug: slug,
+      titulo: dados.titulo,
+      contexto: dados.contexto,
+      status: 'EM_VOTACAO',
+      reuniaoId: reuniao?.id ?? null,
+      reuniaoTitulo: reuniao?.titulo ?? null,
+      abertaEm: new Date().toISOString(),
+      fechaEm: dados.fechaEm,
+      opcoes: dados.opcoes
+        .filter((o) => o.trim() !== '')
+        .map((rotulo) => ({ id: novoId('op'), rotulo, detalhe: null, votos: 0 })),
+      escolhidaId: null,
+      responsavelNome: null,
+      quorum: dados.quorum,
+      votantes: 0,
+      meuVoto: null,
+    }
+    estado.decisoes.unshift(decisao)
+    return responderMudanca(decisao)
+  },
+
+  /**
+   * Encerrar a votação.
+   *
+   * <p>Sem quórum a decisão fica adiada, não rejeitada: são coisas
+   * diferentes na hora de reabrir o assunto no ano seguinte.</p>
+   */
+  encerrarDecisao(id: string): Promise<Decisao | null> {
+    const decisao = estado.decisoes.find((d) => d.id === id)
+    if (decisao && decisao.status === 'EM_VOTACAO') {
+      if (decisao.votantes < decisao.quorum) {
+        decisao.status = 'ADIADA'
+      } else {
+        const vencedora = [...decisao.opcoes].sort((a, b) => b.votos - a.votos)[0]
+        decisao.escolhidaId = vencedora?.id ?? null
+        decisao.status = 'APROVADA'
+      }
+      decisao.fechaEm = new Date().toISOString()
+    }
+    return responderMudanca(decisao ?? null)
+  },
+
   /** Voto único: trocar de opção move o voto, não soma um segundo. */
   votar(decisaoId: string, opcaoId: string): Promise<Decisao | null> {
     const decisao = estado.decisoes.find((d) => d.id === decisaoId)
     if (!decisao || decisao.status !== 'EM_VOTACAO') {
-      return responder(decisao ?? null)
+      return responderMudanca(decisao ?? null)
     }
     if (decisao.meuVoto) {
       const anterior = decisao.opcoes.find((o) => o.id === decisao.meuVoto)
@@ -469,7 +837,7 @@ export const lojaDosModulos = {
       decisao.votantes += 1
       decisao.meuVoto = opcaoId
     }
-    return responder(decisao, 80)
+    return responderMudanca(decisao, 80)
   },
 
   gestoes: (slug: string): Promise<Gestao[]> => responder(daAtletica(GESTOES, slug)),
@@ -483,7 +851,7 @@ export const lojaDosModulos = {
   marcarItemDaTransicao(itemId: string, concluido: boolean): Promise<Transicao> {
     const item = estado.transicao.itens.find((i) => i.id === itemId)
     if (item) item.concluido = concluido
-    return responder(estado.transicao, 70)
+    return responderMudanca(estado.transicao, 70)
   },
 
   documentos: (slug: string): Promise<Documento[]> =>
@@ -505,7 +873,87 @@ export const lojaDosModulos = {
   Promise<Lancamento> {
     const lancamento: Lancamento = { ...dados, id: novoId('ln'), atleticaSlug: slug }
     estado.lancamentos.push(lancamento)
-    return responder(lancamento)
+    return responderMudanca(lancamento)
+  },
+
+  /**
+   * Os meses que já têm movimento e ainda não foram fechados.
+   *
+   * <p>A tela não pede à pessoa que digite uma competência: ela oferece os
+   * meses que existem. Fechar um mês é conferir o que já está lançado, não
+   * redigitá-lo.</p>
+   */
+  competenciasEmAberto(slug: string): Promise<{
+    competencia: string
+    rotulo: string
+    receitas: number
+    despesas: number
+    saldo: number
+    lancamentos: number
+  }[]> {
+    const fechadas = new Set(daAtletica(estado.prestacoes, slug).map((p) => p.competencia))
+    const porMes = new Map<string, Lancamento[]>()
+    daAtletica(estado.lancamentos, slug)
+      .filter((l) => l.situacao === 'CONFIRMADO' && !fechadas.has(l.competencia))
+      .forEach((l) => porMes.set(l.competencia, [...(porMes.get(l.competencia) ?? []), l]))
+
+    return responder([...porMes.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([competencia, lista]) => {
+        const { receitas, despesas } = somarPorNatureza(lista)
+        return {
+          competencia,
+          rotulo: rotuloDaCompetencia(competencia),
+          receitas,
+          despesas,
+          saldo: receitas - despesas,
+          lancamentos: lista.length,
+        }
+      }))
+  },
+
+  /**
+   * Fechar o mês (§28).
+   *
+   * <p>Nasce fechada e privada. Publicar é um segundo gesto, e é assim de
+   * propósito: quem fecha confere primeiro, e só depois decide para quem
+   * aquilo fica visível.</p>
+   */
+  fecharPrestacao(slug: string, competencia: string): Promise<PrestacaoDeContas> {
+    const lancamentos = daAtletica(estado.lancamentos, slug)
+      .filter((l) => l.competencia === competencia && l.situacao === 'CONFIRMADO')
+    const { receitas, despesas } = somarPorNatureza(lancamentos)
+
+    const prestacao: PrestacaoDeContas = {
+      id: novoId('pc'),
+      atleticaSlug: slug,
+      competencia,
+      rotulo: rotuloDaCompetencia(competencia),
+      receitas,
+      despesas,
+      saldo: receitas - despesas,
+      publicada: false,
+      publicaParaMembros: false,
+      publicaParaTodos: false,
+      aprovadaEm: new Date().toISOString(),
+      documentos: [],
+      linhas: lancamentos.map((l) => ({
+        descricao: l.descricao, natureza: l.natureza, valor: l.valor,
+      })),
+    }
+    estado.prestacoes.unshift(prestacao)
+    return responderMudanca(prestacao)
+  },
+
+  /** Para membros, ou para todo mundo. Abrir para fora é decisão da diretoria. */
+  publicarPrestacao(id: string, alcance: 'MEMBROS' | 'TODOS'): Promise<PrestacaoDeContas | null> {
+    const prestacao = estado.prestacoes.find((p) => p.id === id)
+    if (prestacao) {
+      prestacao.publicada = true
+      prestacao.publicaParaMembros = true
+      prestacao.publicaParaTodos = alcance === 'TODOS'
+    }
+    return responderMudanca(prestacao ?? null)
   },
 
   prestacoes: (slug: string): Promise<PrestacaoDeContas[]> =>
@@ -523,7 +971,7 @@ export const lojaDosModulos = {
       patrocinio.etapa = etapa
       patrocinio.atualizadoEm = new Date().toISOString()
     }
-    return responder(patrocinio ?? null, 70)
+    return responderMudanca(patrocinio ?? null, 70)
   },
 
   // ---------------- Esportes ----------------
@@ -552,7 +1000,7 @@ export const lojaDosModulos = {
       status: 'ABERTO', respostas: [], experienciaId: null,
     }
     estado.pedidos.unshift(pedido)
-    return responder(pedido)
+    return responderMudanca(pedido)
   },
 
   responderPedido(
@@ -567,7 +1015,7 @@ export const lojaDosModulos = {
       })
       pedido.status = 'RESPONDIDO'
     }
-    return responder(pedido ?? null)
+    return responderMudanca(pedido ?? null)
   },
 
   /** Só uma resposta pode ser a mais útil: marcar uma desmarca a anterior. */
@@ -577,7 +1025,7 @@ export const lojaDosModulos = {
       pedido.respostas.forEach((r) => { r.maisUtil = r.id === respostaId })
       pedido.status = 'RESOLVIDO'
     }
-    return responder(pedido ?? null, 70)
+    return responderMudanca(pedido ?? null, 70)
   },
 
   comunidades: (): Promise<Comunidade[]> => responder(estado.comunidades),
@@ -594,7 +1042,7 @@ export const lojaDosModulos = {
       comunidade.participo = !comunidade.participo
       comunidade.membros += comunidade.participo ? 1 : -1
     }
-    return responder(comunidade ?? null, 70)
+    return responderMudanca(comunidade ?? null, 70)
   },
 
   amistosos: (): Promise<Amistoso[]> => responder(estado.amistosos),
@@ -605,7 +1053,7 @@ export const lojaDosModulos = {
       amistoso.tenhoInteresse = true
       amistoso.interessadas = [...amistoso.interessadas, minha]
     }
-    return responder(amistoso ?? null, 70)
+    return responderMudanca(amistoso ?? null, 70)
   },
 
   parcerias: (): Promise<Parceria[]> => responder(estado.parcerias),
@@ -617,7 +1065,7 @@ export const lojaDosModulos = {
       parceria.interessadas = [...parceria.interessadas, minha]
       if (parceria.etapa === 'DISPONIVEL') parceria.etapa = 'INTERESSE'
     }
-    return responder(parceria ?? null, 70)
+    return responderMudanca(parceria ?? null, 70)
   },
 
   mentorias: (): Promise<OfertaDeMentoria[]> => responder(MENTORIAS),
@@ -628,9 +1076,44 @@ export const lojaDosModulos = {
   guia: (id: string): Promise<Guia | null> =>
     responder(GUIAS.find((g) => g.id === id) ?? null),
   modelos: (): Promise<Modelo[]> => responder(MODELOS),
-  experiencias: (): Promise<Experiencia[]> => responder(EXPERIENCIAS),
+  experiencias: (): Promise<Experiencia[]> => responder(estado.experiencias),
   experiencia: (id: string): Promise<Experiencia | null> =>
-    responder(EXPERIENCIAS.find((e) => e.id === id) ?? null),
+    responder(estado.experiencias.find((e) => e.id === id) ?? null),
+
+  /**
+   * Registrar o que deu certo e o que não deu (§37).
+   *
+   * <p>O "não funcionou" é o campo que dá valor ao resto: relato só de
+   * acerto vira propaganda, e propaganda ninguém lê para aprender.</p>
+   */
+  publicarExperiencia(minha: AtleticaResumo, dados: {
+    titulo: string
+    area: AreaDeConhecimento
+    contexto: string
+    funcionou: string[]
+    naoFuncionou: string[]
+    fariaDiferente: string[]
+    custo: number | null
+    publico: number | null
+  }): Promise<Experiencia> {
+    const experiencia: Experiencia = {
+      id: novoId('ex'),
+      titulo: dados.titulo,
+      atletica: minha,
+      area: dados.area,
+      quando: competenciaPorExtenso(0),
+      contexto: dados.contexto,
+      funcionou: dados.funcionou,
+      naoFuncionou: dados.naoFuncionou,
+      fariaDiferente: dados.fariaDiferente,
+      custo: dados.custo,
+      publico: dados.publico,
+      util: 0,
+      respostas: 0,
+    }
+    estado.experiencias.unshift(experiencia)
+    return responderMudanca(experiencia)
+  },
 
   // ---------------- Mercado ----------------
   fornecedores: (): Promise<Fornecedor[]> => responder(FORNECEDORES),
@@ -656,7 +1139,7 @@ export const lojaDosModulos = {
       compra.quantidadeAtual = compra.interessados
         .reduce((soma, i) => soma + i.quantidade, 0)
     }
-    return responder(compra ?? null, 90)
+    return responderMudanca(compra ?? null, 90)
   },
 
   oportunidades: (): Promise<Oportunidade[]> => responder(OPORTUNIDADES),
@@ -691,12 +1174,12 @@ export const lojaDosModulos = {
   marcarNotificacaoLida(id: string): Promise<Notificacao[]> {
     const alvo = estado.notificacoes.find((n) => n.id === id)
     if (alvo) alvo.lida = true
-    return responder(estado.notificacoes, 40)
+    return responderMudanca(estado.notificacoes, 40)
   },
 
   marcarTodasLidas(): Promise<Notificacao[]> {
     estado.notificacoes.forEach((n) => { n.lida = true })
-    return responder(estado.notificacoes, 40)
+    return responderMudanca(estado.notificacoes, 40)
   },
 
   buscar(termo: string, contextoSlug: string): Promise<ResultadoDeBusca[]> {
@@ -726,7 +1209,7 @@ export const lojaDosModulos = {
     const prestacoes = daAtletica(estado.prestacoes, slug)
     const torneios = estadoDaDemonstracao.torneiosDe(slug)
     const social = projetos.filter((p) => p.tipo === 'SOCIAL' && p.status === 'CONCLUIDO')
-    const contribuiu = EXPERIENCIAS.some((e) => e.atletica.slug === slug)
+    const contribuiu = estado.experiencias.some((e) => e.atletica.slug === slug)
       || GUIAS.some((g) => g.autorAtletica?.slug === slug)
     const transicao = estado.transicao.atleticaSlug === slug
       && estado.transicao.itens.every((i) => i.concluido)
@@ -769,7 +1252,7 @@ export const lojaDosModulos = {
       .reduce((s, l) => s + l.valor, 0)
     const patrocinios = daAtletica(estado.patrocinios, slug)
       .filter((p) => p.etapa === 'ATIVO').length
-    const contribuicoes = EXPERIENCIAS.filter((e) => e.atletica.slug === slug).length
+    const contribuicoes = estado.experiencias.filter((e) => e.atletica.slug === slug).length
       + GUIAS.filter((g) => g.autorAtletica?.slug === slug).length
 
     const valores: Record<string, number> = {
@@ -819,7 +1302,7 @@ export const lojaDosModulos = {
       'ob-07': eventos.publicados > 0,
       'ob-08': estado.comunidades.some((c) => c.participo),
       'ob-09': daAtletica(estado.prestacoes, slug).length > 0,
-      'ob-10': EXPERIENCIAS.some((e) => e.atletica.slug === slug),
+      'ob-10': estado.experiencias.some((e) => e.atletica.slug === slug),
     }
 
     return responder(estado.onboarding.map(

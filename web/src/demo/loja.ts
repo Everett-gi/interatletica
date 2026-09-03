@@ -30,6 +30,7 @@ import type {
 } from '../api/tipos'
 import type {
   Aviso,
+  AtletaDaEquipe,
   Equipe,
   ItemDaAgendaDaRede,
   LinhaDoQuadroDeMedalhas,
@@ -74,6 +75,16 @@ interface Estado {
   torneios: Torneio[]
   participantes: Record<string, Participante[]>
   minhasInscricoes: Record<string, Inscricao>
+  /** As atléticas criadas nesta visita — o que precisa voltar ao recarregar. */
+  atleticasCriadas: AtleticaResumo[]
+  /**
+   * A demonstração preenchida está aberta.
+   *
+   * <p>Enquanto estiver, nada é gravado: ela existe para apresentar e precisa
+   * abrir idêntica todas as vezes. Persistir uma sessão de apresentação faria
+   * a próxima pessoa herdar o estado da anterior.</p>
+   */
+  modoExemplo: boolean
 }
 
 const estado: Estado = {
@@ -90,11 +101,33 @@ const estado: Estado = {
   torneios: clonar(TORNEIOS),
   participantes: {},
   minhasInscricoes: {},
+  atleticasCriadas: [],
+  modoExemplo: false,
 }
 
 /** Latência simulada: sem ela o app pisca e ninguém vê os estados de carga. */
 function responder<T>(valor: T, ms = 180): Promise<T> {
   return new Promise((resolver) => setTimeout(() => resolver(valor), ms))
+}
+
+/**
+ * Quem avisa que o estado mudou.
+ *
+ * <p>Um retorno de chamada em vez de importar o módulo de sincronização: ele
+ * precisa enxergar as <em>duas</em> lojas, e importá-lo aqui fecharia um
+ * ciclo. Assim a dependência aponta num sentido só — o sincronizador conhece
+ * as lojas, as lojas não o conhecem.</p>
+ */
+let notificarMudanca: () => void = () => {}
+
+export function observarMudancas(fn: () => void): void {
+  notificarMudanca = fn
+}
+
+/** Resposta de uma operação que ALTERA o estado: agenda a gravação. */
+function responderMudanca<T>(valor: T, ms = 180): Promise<T> {
+  notificarMudanca()
+  return responder(valor, ms)
 }
 
 function participantes(eventoId: string): Participante[] {
@@ -167,6 +200,101 @@ export const estadoDaDemonstracao = {
 }
 
 // =====================================================================
+// Persistência: o que é meu sai, o que é exemplo fica de fora
+// =====================================================================
+
+/** Os slugs das atléticas em que a pessoa tem vínculo. */
+function meusSlugs(): Set<string> {
+  return new Set(estado.sessao?.atleticas.map((v) => v.atletica.slug) ?? [])
+}
+
+/** Filtra um dicionário por chave, preservando o formato. */
+function fatiarPorChave<T>(
+  dicionario: Record<string, T>,
+  aceitar: (chave: string) => boolean,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(dicionario).filter(([chave]) => aceitar(chave)))
+}
+
+export interface FatiaDaLoja {
+  atleticasCriadas: AtleticaResumo[]
+  eventos: unknown[]
+  membros: Record<string, unknown>
+  convites: Record<string, unknown>
+  tarefas: unknown[]
+  avisos: unknown[]
+  equipes: unknown[]
+  torneios: unknown[]
+  participantes: Record<string, unknown>
+  minhasInscricoes: Record<string, unknown>
+}
+
+/**
+ * O que desta loja pertence a quem está usando.
+ *
+ * <p>Nada do exemplo entra aqui — nem os eventos dos Dragões, nem os
+ * participantes gerados para eles. O exemplo volta do pacote a cada carga,
+ * com datas relativas a hoje; congelá-lo no armazenamento traria de volta o
+ * envelhecimento que a âncora relativa existe para evitar.</p>
+ */
+export function exportarFatiaDaLoja(): FatiaDaLoja | null {
+  if (estado.modoExemplo || !estado.sessao) {
+    return null
+  }
+  const meus = meusSlugs()
+  const meusEventos = estado.eventos.filter((e) => meus.has(e.atleticaSlug))
+  const idsDeEventos = new Set(meusEventos.map((e) => e.id))
+
+  return {
+    atleticasCriadas: estado.atleticasCriadas,
+    eventos: meusEventos,
+    membros: fatiarPorChave(estado.membros, (s) => meus.has(s)),
+    convites: fatiarPorChave(estado.convites, (s) => meus.has(s)),
+    tarefas: estado.tarefas.filter((t) => meus.has(t.atleticaSlug)),
+    avisos: estado.avisos.filter((a) => meus.has(a.atleticaSlug)),
+    equipes: estado.equipes.filter((e) => meus.has(e.atleticaSlug)),
+    torneios: estado.torneios.filter((t) => meus.has(t.atleticaSlug)),
+    participantes: fatiarPorChave(estado.participantes, (id) => idsDeEventos.has(id)),
+    // Inscrições podem ser em evento de outra atlética: guardar todas.
+    minhasInscricoes: estado.minhasInscricoes,
+  }
+}
+
+export function sessaoAtual(): PerfilDaSessao | null {
+  return estado.modoExemplo ? null : estado.sessao
+}
+
+/**
+ * Recoloca a fatia guardada por cima da semente recém-carregada.
+ *
+ * <p>Acrescenta, nunca substitui: os arrays já vêm cheios do exemplo, e as
+ * atléticas criadas precisam voltar à lista da rede — senão o hub abriria
+ * numa atlética que a busca global e o feed não conhecem.</p>
+ */
+export function importarFatiaDaLoja(
+  fatia: Partial<FatiaDaLoja>,
+  sessao: PerfilDaSessao | null,
+): void {
+  const atleticas = (fatia.atleticasCriadas ?? []) as AtleticaResumo[]
+  atleticas.forEach(registrarAtletica)
+  estado.atleticasCriadas = atleticas
+
+  estado.eventos.push(...(fatia.eventos ?? []) as typeof estado.eventos)
+  Object.assign(estado.membros, fatia.membros ?? {})
+  Object.assign(estado.convites, fatia.convites ?? {})
+  estado.tarefas.push(...(fatia.tarefas ?? []) as Tarefa[])
+  estado.avisos.push(...(fatia.avisos ?? []) as Aviso[])
+  estado.equipes.push(...(fatia.equipes ?? []) as Equipe[])
+  estado.torneios.push(...(fatia.torneios ?? []) as Torneio[])
+  Object.assign(estado.participantes, fatia.participantes ?? {})
+  Object.assign(estado.minhasInscricoes, fatia.minhasInscricoes ?? {})
+
+  estado.sessao = sessao
+  estado.modoExemplo = false
+}
+
+// =====================================================================
 // Leituras
 // =====================================================================
 
@@ -183,6 +311,7 @@ export const lojaDemo = {
    */
   entrar(): Promise<PerfilDaSessao> {
     estado.sessao = clonar(SESSAO_DEMO)
+    estado.modoExemplo = true
     return responder(estado.sessao)
   },
 
@@ -195,6 +324,7 @@ export const lojaDemo = {
    * propósito.</p>
    */
   cadastrar(nome: string, email: string): Promise<PerfilDaSessao> {
+    estado.modoExemplo = false
     estado.sessao = {
       id: novoId('u'),
       nome: nome.trim(),
@@ -204,7 +334,7 @@ export const lojaDemo = {
       atleticas: [],
       convitesPendentes: 0,
     }
-    return responder(estado.sessao)
+    return responderMudanca(estado.sessao)
   },
 
   /**
@@ -237,6 +367,7 @@ export const lojaDemo = {
     }
 
     registrarAtletica(atletica)
+    estado.atleticasCriadas.push(atletica)
 
     const sessao = estado.sessao
     if (sessao) {
@@ -259,12 +390,22 @@ export const lojaDemo = {
       ]
     }
 
-    return responder(atletica)
+    return responderMudanca(atletica)
   },
 
+  /**
+   * Sai da sessão.
+   *
+   * <p>Numa demonstração sem senha, sair é irreversível: não há como voltar a
+   * entrar na conta que existia. Por isso a interface confirma antes, e por
+   * isso limpar o que estava guardado é o comportamento certo — deixar o
+   * registro órfão no navegador seria guardar dado que ninguém mais alcança.</p>
+   */
   sair(): Promise<null> {
     estado.sessao = null
-    return responder(null)
+    estado.modoExemplo = false
+    estado.atleticasCriadas = []
+    return responderMudanca(null)
   },
 
   /**
@@ -279,7 +420,7 @@ export const lojaDemo = {
   assumirPapel(papel: Papel | 'VISITANTE'): Promise<PerfilDaSessao | null> {
     if (papel === 'VISITANTE') {
       estado.sessao = null
-      return responder(null)
+      return responderMudanca(null)
     }
     const base = estado.sessao
       ? clonar(estado.sessao)
@@ -288,7 +429,7 @@ export const lojaDemo = {
       i === 0 ? { ...v, papel, cargo: rotuloDoCargo(papel) } : v)
     base.operador = papel === 'PRESIDENTE'
     estado.sessao = base
-    return responder(base)
+    return responderMudanca(base)
   },
 
   vitrine: () => responder(ATLETICAS),
@@ -428,7 +569,7 @@ export const lojaDemo = {
       organizadoras: [slug],
     }
     estado.eventos.unshift(novo)
-    return responder(novo)
+    return responderMudanca(novo)
   },
 
   atualizarEvento(id: string, dados: Partial<Evento>): Promise<Evento | null> {
@@ -436,7 +577,7 @@ export const lojaDemo = {
     if (evento) {
       Object.assign(evento, dados)
     }
-    return responder(evento ?? null)
+    return responderMudanca(evento ?? null)
   },
 
   mudarStatusDoEvento(id: string, status: StatusDoEvento): Promise<Evento | null> {
@@ -445,7 +586,7 @@ export const lojaDemo = {
       evento.status = status
       evento.publicadoEm = status === 'PUBLICADO' ? new Date().toISOString() : null
     }
-    return responder(evento ?? null)
+    return responderMudanca(evento ?? null)
   },
 
   // ------------------------------------------------------------------
@@ -478,7 +619,7 @@ export const lojaDemo = {
       eventoInicioEm: evento.inicioEm,
     }
     estado.minhasInscricoes[eventoId] = inscricao
-    return responder(inscricao)
+    return responderMudanca(inscricao)
   },
 
   cancelarInscricao(eventoId: string): Promise<null> {
@@ -497,7 +638,7 @@ export const lojaDemo = {
       }
       delete estado.minhasInscricoes[eventoId]
     }
-    return responder(null)
+    return responderMudanca(null)
   },
 
   minhasInscricoes: (): Promise<Inscricao[]> =>
@@ -515,7 +656,7 @@ export const lojaDemo = {
         evento.inscritosConfirmados = Math.max(0, evento.inscritosConfirmados - 1)
       }
     }
-    return responder(null)
+    return responderMudanca(null)
   },
 
   checkin(eventoId: string, token: string): Promise<ResultadoDoCheckin> {
@@ -527,14 +668,14 @@ export const lojaDemo = {
       : undefined
 
     if (!alvo) {
-      return responder({
+      return responderMudanca({
         liberado: false,
         mensagem: 'Código não corresponde a nenhuma inscrição deste evento.',
         nome: null, status: null, checkinEm: null,
       })
     }
     alvo.checkinEm = new Date().toISOString()
-    return responder({
+    return responderMudanca({
       liberado: true,
       mensagem: 'Entrada liberada.',
       nome: alvo.nome,
@@ -554,7 +695,7 @@ export const lojaDemo = {
     if (membro) {
       membro.papel = papel
     }
-    return responder(membro ?? null)
+    return responderMudanca(membro ?? null)
   },
 
   desligarMembro(slug: string, membroId: string): Promise<null> {
@@ -563,7 +704,7 @@ export const lojaDemo = {
       membro.situacao = 'INATIVO'
       membro.saiuEm = new Date().toISOString()
     }
-    return responder(null)
+    return responderMudanca(null)
   },
 
   convites: (slug: string) => responder(estado.convites[slug] ?? []),
@@ -578,12 +719,55 @@ export const lojaDemo = {
       criadoEm: new Date().toISOString(),
     }
     estado.convites[slug] = [convite, ...(estado.convites[slug] ?? [])]
-    return responder(convite)
+    return responderMudanca(convite)
   },
 
   revogarConvite(slug: string, id: string): Promise<null> {
     estado.convites[slug] = (estado.convites[slug] ?? []).filter((c) => c.id !== id)
-    return responder(null)
+    return responderMudanca(null)
+  },
+
+  /**
+   * Faz o convidado aceitar — só na demonstração.
+   *
+   * <p>Com a API conectada quem aceita é a outra pessoa, abrindo o link que
+   * chegou no e-mail dela. Aqui não há e-mail nem segunda pessoa, e sem
+   * este atalho a demonstração trava no ponto mais importante: uma atlética
+   * de uma pessoa só não mostra nada do que a plataforma faz — nem
+   * diretoria, nem responsável de tarefa, nem quórum de decisão.</p>
+   *
+   * <p>Está explícito na tela como simulação, e não escondido: fingir que
+   * o convite se aceita sozinho seria mentir sobre o fluxo.</p>
+   */
+  simularAceite(slug: string, conviteId: string, nome: string): Promise<Membro | null> {
+    const convite = (estado.convites[slug] ?? []).find((c) => c.id === conviteId)
+    if (!convite) {
+      return responderMudanca(null)
+    }
+    const membro: Membro = {
+      id: novoId('m'),
+      usuarioId: novoId('u'),
+      nome: nome.trim() || convite.email.split('@')[0],
+      email: convite.email,
+      avatarUrl: null,
+      papel: convite.papel,
+      cargo: null,
+      situacao: 'ATIVO',
+      entrouEm: new Date().toISOString(),
+      saiuEm: null,
+    }
+    estado.membros[slug] = [...(estado.membros[slug] ?? []), membro]
+    estado.convites[slug] = (estado.convites[slug] ?? []).filter((c) => c.id !== conviteId)
+    return responderMudanca(membro)
+  },
+
+  /** O cargo é o escopo escrito: "diretor" sem cargo não diz de quê. */
+  definirCargo(slug: string, membroId: string, cargo: string): Promise<Membro | null> {
+    const membro = estado.membros[slug]?.find((m) => m.id === membroId)
+    if (membro) {
+      membro.cargo = cargo.trim() === '' ? null : cargo.trim()
+    }
+    return responderMudanca(membro ?? null)
   },
 
   // ------------------------------------------------------------------
@@ -592,6 +776,49 @@ export const lojaDemo = {
 
   equipes: (slug: string) =>
     responder(estado.equipes.filter((e) => e.atleticaSlug === slug)),
+
+  /**
+   * A equipe é da atlética e atravessa os eventos (§30).
+   *
+   * <p>Não nasce dentro de um campeonato: o time de futsal é o mesmo no
+   * interatlética de março e no amistoso de outubro. Amarrá-la a um evento
+   * obrigaria a recadastrar o elenco inteiro a cada torneio.</p>
+   */
+  criarEquipe(slug: string, dados: {
+    nome: string
+    tag: string | null
+    modalidade: string
+  }): Promise<Equipe> {
+    const equipe: Equipe = {
+      id: novoId('eq'),
+      atleticaSlug: slug,
+      nome: dados.nome,
+      tag: dados.tag,
+      modalidade: dados.modalidade,
+      escudoUrl: null,
+      ativa: true,
+      elenco: [],
+    }
+    estado.equipes.push(equipe)
+    return responderMudanca(equipe)
+  },
+
+  /** O elenco sai dos membros: atleta que não é da atlética não joga por ela. */
+  escalarNaEquipe(equipeId: string, atleta: AtletaDaEquipe): Promise<Equipe | null> {
+    const equipe = estado.equipes.find((e) => e.id === equipeId)
+    if (equipe && !equipe.elenco.some((a) => a.usuarioId === atleta.usuarioId)) {
+      equipe.elenco.push(atleta)
+    }
+    return responderMudanca(equipe ?? null)
+  },
+
+  tirarDaEquipe(equipeId: string, usuarioId: string): Promise<Equipe | null> {
+    const equipe = estado.equipes.find((e) => e.id === equipeId)
+    if (equipe) {
+      equipe.elenco = equipe.elenco.filter((a) => a.usuarioId !== usuarioId)
+    }
+    return responderMudanca(equipe ?? null)
+  },
 
   torneios: (slug: string) =>
     responder(estado.torneios.filter((t) => t.atleticaSlug === slug)),
@@ -613,7 +840,7 @@ export const lojaDemo = {
     const torneio = estado.torneios.find((t) => t.id === torneioId)
     const partida = torneio?.partidas.find((p) => p.id === partidaId)
     if (!torneio || !partida) {
-      return responder(null)
+      return responderMudanca(null)
     }
 
     partida.placarA = placarA
@@ -640,7 +867,7 @@ export const lojaDemo = {
       eliminado.situacao = 'ELIMINADO'
     }
 
-    return responder(torneio)
+    return responderMudanca(torneio)
   },
 
   tarefas: (slug: string) =>
@@ -652,7 +879,7 @@ export const lojaDemo = {
       tarefa.status = status
       tarefa.concluidaEm = status === 'CONCLUIDA' ? new Date().toISOString() : null
     }
-    return responder(tarefa ?? null, 60)
+    return responderMudanca(tarefa ?? null, 60)
   },
 
   criarTarefa(slug: string, titulo: string, prioridade: Tarefa['prioridade']): Promise<Tarefa> {
@@ -663,7 +890,7 @@ export const lojaDemo = {
       status: 'ABERTA', concluidaEm: null,
     }
     estado.tarefas.unshift(tarefa)
-    return responder(tarefa, 60)
+    return responderMudanca(tarefa, 60)
   },
 
   avisos: (slug: string) =>
@@ -677,7 +904,7 @@ export const lojaDemo = {
       autorNome: estado.sessao?.nome ?? 'Diretoria', autorAvatarUrl: null,
     }
     estado.avisos.unshift(aviso)
-    return responder(aviso)
+    return responderMudanca(aviso)
   },
 
   // ------------------------------------------------------------------

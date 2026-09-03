@@ -1,12 +1,15 @@
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Equipe, FuncaoNaEquipe } from '../../../api/tipos-rede'
 import type { Jogo } from '../../../api/tipos-esportes'
+import type { Membro } from '../../../api/tipos'
 import { Avatar, Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { dataEHora, percentual, quando } from '../../../formatos'
 import { atleticaPorSlug } from '../../../demo/dados'
+import { useSessao } from '../../../sessao/SessaoContexto'
 
 const FUNCAO: Record<FuncaoNaEquipe, { rotulo: string; classe: string }> = {
   CAPITAO: { rotulo: 'Capitão', classe: 'etiqueta--acento' },
@@ -18,6 +21,7 @@ const FUNCAO: Record<FuncaoNaEquipe, { rotulo: string; classe: string }> = {
 interface Composicao {
   equipe: Equipe | undefined
   jogos: Jogo[]
+  membros: Membro[]
 }
 
 /**
@@ -30,19 +34,29 @@ interface Composicao {
  */
 export function DetalheDaEquipe() {
   const { slug = '', id = '' } = useParams()
+  const { podeAtuarComo } = useSessao()
+  const diretor = podeAtuarComo(slug, 'DIRETOR')
+  const [escalando, setEscalando] = useState(false)
 
   const busca = useBusca<Composicao>(async () => {
-    const [equipes, jogos] = await Promise.all([
+    const [equipes, jogos, membros] = await Promise.all([
       Dados.equipes(slug),
       Dados.jogos(slug),
+      Dados.membros(slug),
     ])
-    return { equipe: equipes.find((e) => e.id === id), jogos }
+    return { equipe: equipes.find((e) => e.id === id), jogos, membros }
   }, [slug, id])
+
+  /** Troca a equipe no resultado da busca sem refazer as três chamadas. */
+  const trocarEquipe = (equipe: Equipe) => {
+    const atual = busca.dados
+    if (atual) busca.definir({ ...atual, equipe })
+  }
 
   return (
     <div>
       <Conteudo busca={busca} esqueleto={<Esqueleto altura="20rem" />}>
-        {({ equipe, jogos }) => {
+        {({ equipe, jogos, membros }) => {
           if (!equipe) {
             return (
               <EstadoVazio icone="equipes" titulo="Equipe não encontrada">
@@ -93,8 +107,37 @@ export function DetalheDaEquipe() {
 
               <div className="detalhe">
                 <div>
-                  <Secao titulo="Elenco">
+                  <Secao
+                    titulo="Elenco"
+                    acao={diretor ? (
+                      <button
+                        className="botao botao--fantasma botao--pequeno"
+                        onClick={() => setEscalando((v) => !v)}
+                      >
+                        <Icone nome="mais" tamanho={15} /> Escalar alguém
+                      </button>
+                    ) : undefined}
+                  >
+                    {escalando ? (
+                      <FormularioDeEscalacao
+                        equipe={equipe}
+                        membros={membros}
+                        aoEscalar={(atualizada) => {
+                          trocarEquipe(atualizada)
+                          setEscalando(false)
+                        }}
+                        aoCancelar={() => setEscalando(false)}
+                      />
+                    ) : null}
+
                     <div className="cartao">
+                      {equipe.elenco.length === 0 ? (
+                        <p className="fraco" style={{ margin: 0 }}>
+                          Ninguém escalado ainda. O elenco sai da lista de
+                          membros da atlética — quem não é membro não joga
+                          por ela.
+                        </p>
+                      ) : null}
                       <div className="pilha pilha--densa">
                         {equipe.elenco.map((atleta) => (
                           <div key={atleta.usuarioId} className="linha">
@@ -111,6 +154,18 @@ export function DetalheDaEquipe() {
                             <span className={`etiqueta ${FUNCAO[atleta.funcao].classe}`}>
                               {FUNCAO[atleta.funcao].rotulo}
                             </span>
+                            {diretor ? (
+                              <button
+                                className="icone-botao"
+                                aria-label={`Tirar ${atleta.nome} do elenco`}
+                                onClick={() => {
+                                  void Dados.tirarDaEquipe(equipe.id, atleta.usuarioId)
+                                    .then((e) => { if (e) trocarEquipe(e) })
+                                }}
+                              >
+                                <Icone nome="fechar" tamanho={15} />
+                              </button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -231,5 +286,110 @@ export function DetalheDaEquipe() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * Escalar alguém que já é membro.
+ *
+ * <p>A lista só oferece membros ativos, e some quem já está no elenco. Deixar
+ * digitar um nome livre abriria a porta para atleta que não pertence à
+ * atlética — que é exatamente o que a conferência de elegibilidade num
+ * interatlética procura.</p>
+ */
+function FormularioDeEscalacao({ equipe, membros, aoEscalar, aoCancelar }: {
+  equipe: Equipe
+  membros: Membro[]
+  aoEscalar: (equipe: Equipe) => void
+  aoCancelar: () => void
+}) {
+  const jaNoElenco = new Set(equipe.elenco.map((a) => a.usuarioId))
+  const disponiveis = membros.filter(
+    (m) => m.situacao === 'ATIVO' && !jaNoElenco.has(m.usuarioId))
+
+  const [usuarioId, setUsuarioId] = useState(disponiveis[0]?.usuarioId ?? '')
+  const [funcao, setFuncao] = useState<FuncaoNaEquipe>('TITULAR')
+  const [numero, setNumero] = useState('')
+  const [nick, setNick] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  if (disponiveis.length === 0) {
+    return (
+      <div className="aviso" style={{ marginBottom: '0.9rem' }}>
+        <strong>Todo mundo já está escalado</strong>
+        <p className="fraco" style={{ margin: '0.3rem 0 0' }}>
+          Para escalar mais gente, convide novos membros para a atlética.
+        </p>
+        <button className="botao botao--fantasma botao--pequeno"
+                style={{ marginTop: '0.5rem' }} onClick={aoCancelar}>
+          Fechar
+        </button>
+      </div>
+    )
+  }
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    const membro = disponiveis.find((m) => m.usuarioId === usuarioId)
+    if (!membro) return
+    setSalvando(true)
+    const atualizada = await Dados.escalarNaEquipe(equipe.id, {
+      usuarioId: membro.usuarioId,
+      nome: membro.nome,
+      avatarUrl: membro.avatarUrl,
+      funcao,
+      numero: numero === '' ? null : Number(numero),
+      nick: nick.trim() === '' ? null : nick.trim(),
+    })
+    setSalvando(false)
+    if (atualizada) aoEscalar(atualizada)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '0.9rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <label className="campo">
+        <span className="campo__rotulo">Quem</span>
+        <select value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)}>
+          {disponiveis.map((m) => (
+            <option key={m.usuarioId} value={m.usuarioId}>{m.nome}</option>
+          ))}
+        </select>
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Função</span>
+          <select value={funcao}
+                  onChange={(e) => setFuncao(e.target.value as FuncaoNaEquipe)}>
+            {(Object.keys(FUNCAO) as FuncaoNaEquipe[]).map((f) => (
+              <option key={f} value={f}>{FUNCAO[f].rotulo}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Número (opcional)</span>
+          <input type="number" min={0} max={99} value={numero}
+                 onChange={(e) => setNumero(e.target.value)} placeholder="10" />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Nickname (opcional)</span>
+        <input value={nick} onChange={(e) => setNick(e.target.value)}
+               maxLength={40} placeholder="Só nas modalidades de e-sports" />
+      </label>
+
+      <div className="linha">
+        <button className="botao botao--pequeno" type="submit" disabled={salvando}>
+          {salvando ? 'Escalando…' : 'Escalar'}
+        </button>
+        <button className="botao botao--fantasma botao--pequeno" type="button"
+                onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

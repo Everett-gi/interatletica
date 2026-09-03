@@ -307,6 +307,10 @@ code {
 .grade--metricas {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
 }
+/* Dois campos lado a lado num formulario: cai para um so quando nao cabe. */
+.grade--dupla {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
 
 .cabecalho-de-secao {
   display: flex;
@@ -1962,6 +1966,18 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
   color: var(--acento);
   text-decoration: underline;
 }
+
+/* Um botao que se le como link, para acao secundaria dentro de um texto
+   corrido. Botao de verdade por baixo: nao navega, entao nao e <a>. */
+.ligacao {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--acento);
+  font: inherit;
+  cursor: pointer;
+}
+.ligacao:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------------ */
 /* Tour de primeiro acesso                                            */

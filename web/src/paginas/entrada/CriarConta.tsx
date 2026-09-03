@@ -107,8 +107,10 @@ export function CriarConta() {
               <>
                 <h3>Criar conta na demonstração</h3>
                 <p className="fraco">
-                  Nada é enviado nem salvo. A sessão vive só nesta aba e some ao
-                  recarregar.
+                  Nada é enviado a servidor nenhum. A conta e a atlética que
+                  você criar ficam guardadas <strong>neste navegador</strong> e
+                  sobrevivem ao recarregar — dá para fechar a aba e voltar
+                  depois.
                 </p>
 
                 <form onSubmit={(e) => void criar(e)}>

@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Decisao, StatusDaDecisao } from '../../../api/tipos-gestao'
@@ -28,6 +29,7 @@ export function Decisoes() {
   const { podeAtuarComo } = useSessao()
   const diretor = podeAtuarComo(slug, 'DIRETOR')
   const decisoes = useBusca<Decisao[]>(() => Dados.decisoes(slug), [slug])
+  const [compondo, setCompondo] = useState(false)
 
   return (
     <div>
@@ -35,12 +37,22 @@ export function Decisoes() {
         titulo="Decisões"
         descricao="O que a diretoria precisa escolher, e o registro do que já foi escolhido."
         acoes={diretor ? (
-          <button className="botao" disabled
-                  title="Abrir decisão chega com a API conectada">
+          <button className="botao" onClick={() => setCompondo((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Nova decisão
           </button>
         ) : undefined}
       />
+
+      {compondo ? (
+        <FormularioDeDecisao
+          slug={slug}
+          aoAbrir={(decisao) => {
+            decisoes.definir([decisao, ...(decisoes.dados ?? [])])
+            setCompondo(false)
+          }}
+          aoCancelar={() => setCompondo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={decisoes}
@@ -58,6 +70,11 @@ export function Decisoes() {
                   A primeira decisão registrada aqui é a primeira que a próxima
                   gestão vai conseguir entender.
                 </p>
+                {diretor && !compondo ? (
+                  <button className="botao" onClick={() => setCompondo(true)}>
+                    <Icone nome="mais" tamanho={16} /> Abrir a primeira decisão
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -188,5 +205,132 @@ function CartaoDeDecisao({ decisao, slug }: { decisao: Decisao; slug: string }) 
         </div>
       ) : null}
     </Link>
+  )
+}
+
+/**
+ * Abrir uma decisão.
+ *
+ * <p>Duas opções no mínimo, porque votação de opção única é homologação, não
+ * decisão. O quórum é declarado agora — ajustá-lo depois de ver o resultado
+ * é como a decisão de atlética costuma perder legitimidade.</p>
+ */
+function FormularioDeDecisao({ slug, aoAbrir, aoCancelar }: {
+  slug: string
+  aoAbrir: (decisao: Decisao) => void
+  aoCancelar: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [contexto, setContexto] = useState('')
+  const [opcoes, setOpcoes] = useState<string[]>(['', ''])
+  const [quorum, setQuorum] = useState('3')
+  const [prazo, setPrazo] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const mudarOpcao = (i: number, valor: string) =>
+    setOpcoes((atual) => atual.map((o, j) => (j === i ? valor : o)))
+
+  const preenchidas = opcoes.filter((o) => o.trim() !== '')
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const decisao = await Dados.abrirDecisao(slug, {
+      titulo: titulo.trim(),
+      contexto: contexto.trim(),
+      opcoes: preenchidas.map((o) => o.trim()),
+      quorum: Number(quorum) || 1,
+      fechaEm: prazo === '' ? null : new Date(`${prazo}T23:59:00`).toISOString(),
+    })
+    setSalvando(false)
+    aoAbrir(decisao)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Nova decisão</h3>
+      <p className="fraco">
+        Escreva o contexto como se fosse lido daqui a um ano por alguém que
+        não estava na sala. É esse texto que responde "por que decidimos
+        assim?" na transição de gestão.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que precisa ser decidido</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Fornecedor do uniforme de 2027" />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Contexto</span>
+        <textarea value={contexto} onChange={(e) => setContexto(e.target.value)}
+                  required
+                  placeholder="O que está em jogo, quanto custa cada caminho, o que já foi tentado." />
+      </label>
+
+      <div className="campo">
+        <span className="campo__rotulo">Opções</span>
+        <div className="pilha pilha--densa">
+          {opcoes.map((opcao, i) => (
+            <div key={i} className="linha">
+              <input
+                value={opcao}
+                onChange={(e) => mudarOpcao(i, e.target.value)}
+                maxLength={120}
+                aria-label={`Opção ${i + 1}`}
+                placeholder={i === 0 ? 'Manter o fornecedor atual' : 'Trocar de fornecedor'}
+                style={{ flex: 1 }}
+              />
+              {opcoes.length > 2 ? (
+                <button
+                  type="button" className="icone-botao"
+                  aria-label={`Remover a opção ${i + 1}`}
+                  onClick={() => setOpcoes((a) => a.filter((_, j) => j !== i))}
+                >
+                  <Icone nome="fechar" tamanho={15} />
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <button type="button" className="botao botao--fantasma botao--pequeno"
+                style={{ marginTop: '0.5rem' }}
+                onClick={() => setOpcoes((a) => [...a, ''])}>
+          <Icone nome="mais" tamanho={15} /> Outra opção
+        </button>
+        <span className="campo__dica">
+          Duas no mínimo. Votação de opção única é homologação, não decisão.
+        </span>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Quórum</span>
+          <input type="number" min={1} max={99} value={quorum} required
+                 onChange={(e) => setQuorum(e.target.value)} />
+          <span className="campo__dica">
+            Quantos votos a decisão precisa para valer.
+          </span>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Fecha em (opcional)</span>
+          <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !contexto.trim()
+                  || preenchidas.length < 2}>
+          {salvando ? 'Abrindo…' : 'Abrir para votação'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

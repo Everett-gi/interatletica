@@ -21,12 +21,23 @@
 import { Api } from '../api/rotas'
 import { lojaDemo } from '../demo/loja'
 import { lojaDosModulos } from '../demo/lojaDosModulos'
+import { descartarDemonstracao, iniciarPersistencia } from '../demo/sincronizacao'
 
 /**
  * Ligado por variável de ambiente no build. No Vercel vem `true`; local, com
  * a API rodando, vem vazio e o app fala com o backend de verdade.
  */
 export const MODO_DEMO = import.meta.env.VITE_MODO_DEMO === 'true'
+
+/**
+ * Religa a demonstração ao que ficou guardado no navegador.
+ *
+ * <p>Antes da primeira leitura de sessão, e só no modo demonstração: com a
+ * API de verdade a sessão vem do cookie e não há nada a restaurar.</p>
+ */
+if (MODO_DEMO) {
+  iniciarPersistencia()
+}
 
 /** Fase 1: escolhe a fonte. Fase 2 e 3: sempre a loja de demonstração. */
 export const Dados = {
@@ -46,6 +57,12 @@ export const Dados = {
     return lojaDemo.cadastrar(nome, email)
   },
   criarAtleticaDemo: lojaDemo.criarAtletica,
+
+  /** Apaga o que a demonstração guardou no navegador e recomeça do zero. */
+  recomecarDemo: async () => {
+    await lojaDemo.sair()
+    descartarDemonstracao()
+  },
 
   // ---------------- Rede ----------------
   vitrine: () => (MODO_DEMO ? lojaDemo.vitrine() : Api.vitrine()),
@@ -92,9 +109,16 @@ export const Dados = {
   convites: (slug: string) => (MODO_DEMO ? lojaDemo.convites(slug) : Api.convites.listar(slug)),
   convidar: lojaDemo.convidar,
   revogarConvite: lojaDemo.revogarConvite,
+  definirCargo: lojaDemo.definirCargo,
+  // Só existe na demonstração: com a API, quem aceita é o convidado, pelo
+  // link que chegou no e-mail dele.
+  simularAceite: lojaDemo.simularAceite,
 
   // ---------------- Fase 2 e 3: só demonstração ----------------
   equipes: lojaDemo.equipes,
+  criarEquipe: lojaDemo.criarEquipe,
+  escalarNaEquipe: lojaDemo.escalarNaEquipe,
+  tirarDaEquipe: lojaDemo.tirarDaEquipe,
   torneios: lojaDemo.torneios,
   torneio: lojaDemo.torneio,
   torneioDoEvento: lojaDemo.torneioDoEvento,

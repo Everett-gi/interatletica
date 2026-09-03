@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { AreaDeConhecimento, Experiencia } from '../../../api/tipos-conhecimento'
+import type { AtleticaResumo } from '../../../api/tipos'
 import { Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { dinheiro, numero } from '../../../formatos'
 import { AREA } from '../rede/PedidosDeAjuda'
+import { useSessao } from '../../../sessao/SessaoContexto'
 
 type Filtro = 'TODAS' | AreaDeConhecimento
 
@@ -21,7 +23,10 @@ type Filtro = 'TODAS' | AreaDeConhecimento
  */
 export function Experiencias() {
   const { slug = '' } = useParams()
+  const { vinculo } = useSessao()
+  const minha = vinculo(slug)?.atletica
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
+  const [compondo, setCompondo] = useState(false)
 
   const experiencias = useBusca<Experiencia[]>(() => Dados.experiencias(), [])
 
@@ -34,13 +39,23 @@ export function Experiencias() {
           { rotulo: 'Conhecimento', para: `/hub/${slug}/conhecimento` },
           { rotulo: 'Experiências' },
         ]}
-        acoes={
-          <button className="botao" disabled
-                  title="Publicar experiência chega com a API conectada">
+        acoes={minha ? (
+          <button className="botao" onClick={() => setCompondo((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Registrar experiência
           </button>
-        }
+        ) : undefined}
       />
+
+      {compondo && minha ? (
+        <FormularioDeExperiencia
+          minha={minha}
+          aoPublicar={(nova) => {
+            experiencias.definir([nova, ...(experiencias.dados ?? [])])
+            setCompondo(false)
+          }}
+          aoCancelar={() => setCompondo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={experiencias}
@@ -165,5 +180,137 @@ export function Experiencias() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * As quatro perguntas, na ordem em que precisam ser respondidas.
+ *
+ * <p>"O que não funcionou" é obrigatório, e é a razão de a tela existir:
+ * relato só de acerto é propaganda, e ninguém aprende com propaganda. É
+ * também o campo mais difícil de escrever, então ele vem com exemplo.</p>
+ */
+function FormularioDeExperiencia({ minha, aoPublicar, aoCancelar }: {
+  minha: AtleticaResumo
+  aoPublicar: (experiencia: Experiencia) => void
+  aoCancelar: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [area, setArea] = useState<AreaDeConhecimento>('EVENTOS')
+  const [contexto, setContexto] = useState('')
+  const [funcionou, setFuncionou] = useState('')
+  const [naoFuncionou, setNaoFuncionou] = useState('')
+  const [fariaDiferente, setFariaDiferente] = useState('')
+  const [custo, setCusto] = useState('')
+  const [publico, setPublico] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  /** Uma linha por item: é como as pessoas escrevem lista de verdade. */
+  const emLinhas = (texto: string) =>
+    texto.split('\n').map((l) => l.trim()).filter((l) => l !== '')
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const experiencia = await Dados.publicarExperiencia(minha, {
+      titulo: titulo.trim(),
+      area,
+      contexto: contexto.trim(),
+      funcionou: emLinhas(funcionou),
+      naoFuncionou: emLinhas(naoFuncionou),
+      fariaDiferente: emLinhas(fariaDiferente),
+      custo: custo === '' ? null : Number(custo),
+      publico: publico === '' ? null : Number(publico),
+    })
+    setSalvando(false)
+    aoPublicar(experiencia)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Registrar experiência</h3>
+      <p className="fraco">
+        Escreva enquanto os números ainda estão frescos. Uma linha por item nas
+        listas — é assim que fica legível para quem vai decidir se repete.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que vocês fizeram</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Calourada de 2026 com ingresso solidário" />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Área</span>
+          <select value={area}
+                  onChange={(e) => setArea(e.target.value as AreaDeConhecimento)}>
+            {(Object.keys(AREA) as AreaDeConhecimento[]).map((a) => (
+              <option key={a} value={a}>{AREA[a]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Custo total (opcional)</span>
+          <input type="number" min={0} value={custo}
+                 onChange={(e) => setCusto(e.target.value)} placeholder="4800" />
+          <span className="campo__dica">Conselho sem preço é conselho pela metade.</span>
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Contexto</span>
+        <textarea value={contexto} onChange={(e) => setContexto(e.target.value)}
+                  required
+                  placeholder="Tamanho da atlética, época do ano, o que motivou." />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que funcionou</span>
+        <textarea value={funcionou} onChange={(e) => setFuncionou(e.target.value)}
+                  required
+                  placeholder={'Uma linha por item:\nVenda antecipada pelo formulário\nParceria com a atlética de Direito'} />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que não funcionou</span>
+        <textarea value={naoFuncionou} onChange={(e) => setNaoFuncionou(e.target.value)}
+                  required
+                  placeholder={'Uma linha por item:\nContratamos som demais para o espaço\nA portaria abriu meia hora atrasada'} />
+        <span className="campo__dica">
+          É o campo que faz este banco valer alguma coisa. Relato só de acerto
+          ninguém lê para aprender.
+        </span>
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Público (opcional)</span>
+          <input type="number" min={0} value={publico}
+                 onChange={(e) => setPublico(e.target.value)} placeholder="320" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">O que fariam diferente</span>
+          <textarea value={fariaDiferente}
+                    onChange={(e) => setFariaDiferente(e.target.value)}
+                    placeholder={'Uma linha por item'} />
+        </label>
+      </div>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !contexto.trim()
+                  || !funcionou.trim() || !naoFuncionou.trim()}>
+          {salvando ? 'Publicando…' : 'Publicar para a rede'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../ui/pagina'
+import { Dados, MODO_DEMO } from '../../dados'
+import { CabecalhoDePagina, Chips, Confirmacao, EstadoVazio, Secao } from '../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../ui/icones'
 import { useSessao } from '../../sessao/SessaoContexto'
 import { reiniciarAjuda } from '../../ui/ComoFunciona'
@@ -168,6 +169,7 @@ export function CentralDeAjuda() {
   const [termo, setTermo] = useState('')
   const [aberta, setAberta] = useState<string | null>(null)
   const [reiniciado, setReiniciado] = useState<'ajuda' | 'tour' | null>(null)
+  const [confirmandoReinicio, setConfirmandoReinicio] = useState(false)
 
   const alvo = termo.trim().toLowerCase()
   const visiveis = PERGUNTAS
@@ -295,6 +297,29 @@ export function CentralDeAjuda() {
               Ver de novo ao voltar
             </button>
           </div>
+
+          {/* Só na demonstração: com a API conectada, apagar a própria conta
+              não é um botão de ajuda — é um pedido com consequência jurídica,
+              que mora nas configurações e passa por confirmação por e-mail. */}
+          {MODO_DEMO ? (
+            <div className="cartao">
+              <Icone nome="historico" tamanho={22} />
+              <h3 style={{ marginTop: '0.5rem', marginBottom: '0.2rem' }}>
+                Recomeçar do zero
+              </h3>
+              <p className="fraco" style={{ marginBottom: '0.8rem' }}>
+                Apaga a conta e a atlética que você criou neste navegador e
+                devolve a demonstração ao estado de quem chega pela primeira
+                vez. Serve para apresentar de novo.
+              </p>
+              <button
+                className="botao botao--discreto"
+                onClick={() => setConfirmandoReinicio(true)}
+              >
+                Apagar e recomeçar
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {reiniciado ? (
@@ -305,6 +330,26 @@ export function CentralDeAjuda() {
           </div>
         ) : null}
       </Secao>
+
+      {confirmandoReinicio ? (
+        <Confirmacao
+          titulo="Apagar esta demonstração?"
+          consequencia={
+            'A conta e a atlética que você criou vivem só neste navegador e '
+            + 'não têm senha para voltar a entrar. Tudo o que você montou aqui '
+            + 'se perde.'
+          }
+          rotuloDeConfirmar="Apagar e recomeçar"
+          aoConfirmar={() => {
+            setConfirmandoReinicio(false)
+            // Recarga de verdade, e não navegação do router: a sessão vive
+            // também no contexto de React, e trocar de rota com ela em memória
+            // levaria de volta a um hub cuja atlética acabou de ser apagada.
+            void Dados.recomecarDemo().then(() => window.location.replace('/'))
+          }}
+          aoCancelar={() => setConfirmandoReinicio(false)}
+        />
+      ) : null}
 
       <Secao titulo="Não achou o que procurava?">
         <div className="grade">

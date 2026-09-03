@@ -144,7 +144,7 @@ function PortaDeEntrada() {
 function FaixaDeDemonstracao() {
   return (
     <div className="faixa-demo">
-      Demonstração navegável · dados fictícios, alterações não são salvas
+      Demonstração navegável · dados fictícios, nada sai deste navegador
     </div>
   )
 }

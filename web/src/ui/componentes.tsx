@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 import { FalhaDaApi } from '../api/cliente'
+import { MODO_DEMO } from '../dados'
 import type { AtleticaResumo, StatusDoEvento, TipoDeEvento } from '../api/tipos'
 import { Icone, type NomeDoIcone } from './icones'
 import { corDerivada, iniciais } from './tema'
@@ -430,11 +431,15 @@ export function Previa({ oQueFalta }: { oQueFalta: string }) {
     <div className="aviso aviso--alerta" style={{ marginBottom: '1rem' }}>
       <div className="linha" style={{ gap: '0.5rem' }}>
         <span className="etiqueta etiqueta--alerta">prévia</span>
-        <strong>Esta tela ainda não salva de verdade</strong>
+        <strong>Esta tela ainda não fala com o servidor</strong>
       </div>
       <p className="fraco" style={{ margin: '0.3rem 0 0' }}>
-        {oQueFalta} O banco já tem a tabela; falta o endpoint na API. Até lá,
-        o que você fizer aqui vale só nesta aba.
+        {oQueFalta} O banco já tem a tabela; falta o endpoint na API.{' '}
+        {MODO_DEMO
+          ? 'Na demonstração o que você fizer fica guardado neste navegador: '
+            + 'volta ao recarregar, some se você limpar os dados do site, e '
+            + 'ninguém mais enxerga.'
+          : 'Até lá, o que você fizer aqui vale só nesta aba.'}
       </p>
     </div>
   )

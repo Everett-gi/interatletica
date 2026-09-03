@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../dados'
 import type { Equipe, FuncaoNaEquipe } from '../../api/tipos-rede'
@@ -26,6 +26,7 @@ export function Equipes() {
   const { podeAtuarComo } = useSessao()
   const diretor = podeAtuarComo(slug, 'DIRETOR')
   const [modalidade, setModalidade] = useState('TODAS')
+  const [compondo, setCompondo] = useState(false)
 
   const equipes = useBusca<Equipe[]>(() => Dados.equipes(slug), [slug])
 
@@ -35,13 +36,25 @@ export function Equipes() {
         titulo="Equipes"
         descricao="O elenco por modalidade. A equipe é da atlética e atravessa os eventos — ela se inscreve, não é criada por evento."
         acoes={diretor ? (
-          <button className="botao" disabled title="Cadastro chega com a API conectada">
+          <button className="botao" onClick={() => setCompondo((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Nova equipe
           </button>
         ) : undefined}
       />
 
-      <Previa oQueFalta="Cadastrar e editar elenco ainda não chegam ao servidor." />
+      <Previa oQueFalta="Cadastrar equipe e montar elenco ainda não chegam ao servidor." />
+
+      {compondo ? (
+        <FormularioDeEquipe
+          slug={slug}
+          modalidadesJaUsadas={[...new Set((equipes.dados ?? []).map((e) => e.modalidade))]}
+          aoCriar={(equipe) => {
+            equipes.definir([...(equipes.dados ?? []), equipe])
+            setCompondo(false)
+          }}
+          aoCancelar={() => setCompondo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={equipes}
@@ -60,6 +73,11 @@ export function Equipes() {
                   para que a documentação dos atletas seja conferida antes do
                   sorteio das chaves.
                 </p>
+                {diretor && !compondo ? (
+                  <button className="botao" onClick={() => setCompondo(true)}>
+                    <Icone nome="mais" tamanho={16} /> Cadastrar a primeira equipe
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -113,6 +131,97 @@ export function Equipes() {
   )
 }
 
+/** As modalidades mais comuns, para não obrigar ninguém a digitar "Futsal". */
+const MODALIDADES = [
+  'Futsal masculino', 'Futsal feminino', 'Vôlei masculino', 'Vôlei feminino',
+  'Basquete masculino', 'Basquete feminino', 'Handebol', 'Futebol de campo',
+  'Natação', 'Atletismo', 'Xadrez', 'League of Legends', 'Counter-Strike',
+  'Valorant', 'Cheerleading', 'Bateria',
+]
+
+/**
+ * Cadastrar uma equipe.
+ *
+ * <p>Três campos, e o elenco fica para a ficha dela. Pedir o elenco inteiro
+ * no cadastro é o que faz a diretoria adiar o cadastro — e uma equipe sem
+ * elenco já serve para se inscrever num torneio.</p>
+ */
+function FormularioDeEquipe({ slug, modalidadesJaUsadas, aoCriar, aoCancelar }: {
+  slug: string
+  modalidadesJaUsadas: string[]
+  aoCriar: (equipe: Equipe) => void
+  aoCancelar: () => void
+}) {
+  const [nome, setNome] = useState('')
+  const [tag, setTag] = useState('')
+  const [modalidade, setModalidade] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const opcoes = [...new Set([...modalidadesJaUsadas, ...MODALIDADES])]
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const equipe = await Dados.criarEquipe(slug, {
+      nome: nome.trim(),
+      tag: tag.trim() === '' ? null : tag.trim().toUpperCase(),
+      modalidade: modalidade.trim(),
+    })
+    setSalvando(false)
+    aoCriar(equipe)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Nova equipe</h3>
+      <p className="fraco">
+        O elenco entra depois, na ficha da equipe. Uma equipe sem elenco já
+        pode se inscrever em torneio.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">Nome da equipe</span>
+        <input value={nome} onChange={(e) => setNome(e.target.value)}
+               required maxLength={80} autoFocus
+               placeholder="Vôlei feminino" />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Modalidade</span>
+          <input value={modalidade} onChange={(e) => setModalidade(e.target.value)}
+                 required maxLength={60} list="modalidades-conhecidas"
+                 placeholder="Vôlei feminino" />
+          <datalist id="modalidades-conhecidas">
+            {opcoes.map((m) => <option key={m} value={m} />)}
+          </datalist>
+          <span className="campo__dica">
+            Escolha da lista ou escreva a sua.
+          </span>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Sigla (opcional)</span>
+          <input value={tag} onChange={(e) => setTag(e.target.value)}
+                 maxLength={6} placeholder="VF" />
+          <span className="campo__dica">Aparece na tabela do campeonato.</span>
+        </label>
+      </div>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !nome.trim() || !modalidade.trim()}>
+          {salvando ? 'Cadastrando…' : 'Cadastrar equipe'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function CartaoDeEquipe({ equipe, slug }: { equipe: Equipe; slug: string }) {
   // E-sports usa nickname; esporte de quadra usa número. A mesma tabela
   // guarda os dois, e a tela mostra o que faz sentido para a modalidade.
@@ -129,6 +238,13 @@ function CartaoDeEquipe({ equipe, slug }: { equipe: Equipe; slug: string }) {
         </div>
         <span className="etiqueta">{equipe.elenco.length} atletas</span>
       </div>
+
+      {equipe.elenco.length === 0 ? (
+        <p className="fraco" style={{ margin: 0 }}>
+          Elenco vazio. Monte na ficha da equipe — os nomes saem da lista de
+          membros da atlética.
+        </p>
+      ) : null}
 
       <div className="pilha pilha--densa">
         {equipe.elenco.slice(0, 5).map((atleta) => (

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Dados } from '../../dados'
+import { Dados, MODO_DEMO } from '../../dados'
 import type { Convite, Membro as MembroDto, Papel } from '../../api/tipos'
 import {
   Avatar,
@@ -97,18 +97,41 @@ export function Membros() {
                     {rotuloDoPapel(convite.papel)} · expira {quando(convite.expiraEm)}
                   </div>
                 </div>
-                {presidente ? (
-                  <button
-                    className="botao botao--perigo botao--pequeno"
-                    onClick={() => {
-                      void Dados.revogarConvite(slug, convite.id)
-                      convites.definir(
-                        (convites.dados ?? []).filter((c) => c.id !== convite.id))
-                    }}
-                  >
-                    Revogar
-                  </button>
-                ) : null}
+                <div className="linha">
+                  {/* Só na demonstração: com a API conectada quem aceita é o
+                      convidado, pelo link que chegou no e-mail dele. Sem este
+                      atalho a demonstração trava numa atlética de uma pessoa
+                      só — que não mostra diretoria, nem responsável de
+                      tarefa, nem quórum de decisão. */}
+                  {MODO_DEMO && presidente ? (
+                    <button
+                      className="botao botao--discreto botao--pequeno"
+                      title="Atalho da demonstração: faz o convidado aceitar"
+                      onClick={() => {
+                        void Dados.simularAceite(slug, convite.id, nomeDoEmail(convite.email))
+                          .then(() => {
+                            convites.definir(
+                              (convites.dados ?? []).filter((c) => c.id !== convite.id))
+                            membros.recarregar()
+                          })
+                      }}
+                    >
+                      Simular o aceite
+                    </button>
+                  ) : null}
+                  {presidente ? (
+                    <button
+                      className="botao botao--perigo botao--pequeno"
+                      onClick={() => {
+                        void Dados.revogarConvite(slug, convite.id)
+                        convites.definir(
+                          (convites.dados ?? []).filter((c) => c.id !== convite.id))
+                      }}
+                    >
+                      Revogar
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -262,6 +285,8 @@ function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMuda
 }) {
   const [ocupado, setOcupado] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [editandoCargo, setEditandoCargo] = useState(false)
+  const [cargo, setCargo] = useState(membro.cargo ?? '')
 
   // Trava do último presidente: uma atlética sem presidência ativa não tem
   // quem convide nem quem promova, e precisaria de intervenção no banco para
@@ -288,7 +313,20 @@ function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMuda
         <Avatar nome={membro.nome} url={membro.avatarUrl} tamanho="m" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <strong>{membro.nome}</strong>
-          <div className="fraco">{membro.cargo ?? rotuloDoPapel(membro.papel)}</div>
+          <div className="fraco">
+            {membro.cargo ?? rotuloDoPapel(membro.papel)}
+            {podeGerenciar && !editandoCargo ? (
+              <>
+                {' · '}
+                <button
+                  className="ligacao"
+                  onClick={() => setEditandoCargo(true)}
+                >
+                  {membro.cargo ? 'trocar o cargo' : 'dar um cargo'}
+                </button>
+              </>
+            ) : null}
+          </div>
           <div className="fraco">
             {membro.situacao === 'ATIVO'
               ? `desde ${quando(membro.entrouEm)}`
@@ -300,6 +338,39 @@ function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMuda
           {rotuloDoPapel(membro.papel)}
         </span>
       </div>
+
+      {/* Papel diz o que a pessoa PODE fazer; cargo diz do que ela cuida.
+          Sem o segundo, "diretor" não informa nada — e é o escopo escrito
+          que evita presidente fazendo tudo (§14). */}
+      {editandoCargo ? (
+        <div className="linha" style={{ marginBottom: '0.7rem' }}>
+          <input
+            value={cargo} autoFocus maxLength={60}
+            onChange={(e) => setCargo(e.target.value)}
+            aria-label={`Cargo de ${membro.nome}`}
+            placeholder="Diretora financeira"
+            style={{ flex: 1, minWidth: '8rem' }}
+          />
+          <button
+            className="botao botao--pequeno"
+            disabled={ocupado}
+            onClick={() => {
+              setOcupado(true)
+              void Dados.definirCargo(slug, membro.id, cargo).then(() => {
+                setOcupado(false)
+                setEditandoCargo(false)
+                aoMudar()
+              })
+            }}
+          >
+            Salvar
+          </button>
+          <button className="botao botao--fantasma botao--pequeno"
+                  onClick={() => { setCargo(membro.cargo ?? ''); setEditandoCargo(false) }}>
+            Cancelar
+          </button>
+        </div>
+      ) : null}
 
       {podeGerenciar ? (
         <div className="linha">
@@ -417,4 +488,19 @@ function FormularioDeConvite({ slug, aoConvidar, aoFechar }: {
       </form>
     </section>
   )
+}
+
+/**
+ * Um nome apresentável a partir do e-mail do convite.
+ *
+ * <p>Serve só ao aceite simulado da demonstração: no fluxo real o nome vem
+ * da conta Google de quem aceita.</p>
+ */
+function nomeDoEmail(email: string): string {
+  return email
+    .split('@')[0]
+    .split(/[._-]+/)
+    .filter((parte) => parte !== '')
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+    .join(' ')
 }
