@@ -11,7 +11,7 @@ import {
   Segmentado,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, quando } from '../../../formatos'
+import { dataEHora, plural, quando } from '../../../formatos'
 
 type Visao = 'LISTA' | 'MAPA'
 
@@ -196,7 +196,7 @@ export function ExplorarAtleticas() {
                               item.vagasRestantes === 0
                                 ? 'etiqueta--alerta' : 'etiqueta--sucesso'}`}>
                               {item.vagasRestantes === 0
-                                ? 'lista de espera' : `${item.vagasRestantes} vagas`}
+                                ? 'lista de espera' : plural(item.vagasRestantes, 'vaga')}
                             </span>
                           ) : null}
                         </div>

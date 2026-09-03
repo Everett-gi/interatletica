@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { AreaDeConhecimento, OfertaDeMentoria } from '../../../api/tipos-conhecimento'
@@ -6,6 +6,8 @@ import { Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/comp
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { AREA } from '../rede/PedidosDeAjuda'
+import { useSessao } from '../../../sessao/SessaoContexto'
+import type { AtleticaResumo } from '../../../api/tipos'
 
 type Filtro = 'TODAS' | AreaDeConhecimento
 
@@ -19,9 +21,16 @@ type Filtro = 'TODAS' | AreaDeConhecimento
  */
 export function Mentoria() {
   const { slug = '' } = useParams()
+  const { perfil, vinculo } = useSessao()
+  const minha = vinculo(slug)?.atletica
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
+  const [ofertando, setOfertando] = useState(false)
 
   const mentorias = useBusca<OfertaDeMentoria[]>(() => Dados.mentorias(), [])
+
+  /** Troca uma oferta na lista sem refazer a busca. */
+  const substituir = (m: OfertaDeMentoria) => mentorias.definir(
+    (mentorias.dados ?? []).map((x) => (x.id === m.id ? m : x)))
 
   return (
     <div>
@@ -32,13 +41,25 @@ export function Mentoria() {
           { rotulo: 'Conhecimento', para: `/hub/${slug}/conhecimento` },
           { rotulo: 'Mentoria' },
         ]}
-        acoes={
-          <button className="botao botao--discreto" disabled
-                  title="Oferecer mentoria chega com a API conectada">
+        acoes={minha ? (
+          <button className="botao botao--discreto"
+                  onClick={() => setOfertando((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Oferecer mentoria
           </button>
-        }
+        ) : undefined}
       />
+
+      {ofertando && minha ? (
+        <FormularioDeMentoria
+          minha={minha}
+          nomeSugerido={perfil?.nome ?? ''}
+          aoOfertar={(oferta) => {
+            mentorias.definir([oferta, ...(mentorias.dados ?? [])])
+            setOfertando(false)
+          }}
+          aoCancelar={() => setOfertando(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={mentorias}
@@ -56,6 +77,11 @@ export function Mentoria() {
                   Se a sua atlética domina alguma área, ofereça acompanhamento.
                   É a forma mais direta de a rede crescer com qualidade.
                 </p>
+                {minha && !ofertando ? (
+                  <button className="botao" onClick={() => setOfertando(true)}>
+                    <Icone nome="mais" tamanho={16} /> Oferecer a primeira
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -133,13 +159,31 @@ export function Mentoria() {
                           {m.atleticasAtendidas === 1
                             ? 'atlética já atendida' : 'atléticas já atendidas'}
                         </span>
-                        <button className="botao botao--discreto botao--pequeno"
-                                disabled={!m.disponivel}
-                                title={m.disponivel
-                                  ? 'Solicitar chega com a API conectada'
-                                  : 'Sem vaga no momento'}>
-                          Solicitar
-                        </button>
+                        {minha && m.atletica.slug === minha.slug ? (
+                          <button
+                            className="botao botao--fantasma botao--pequeno"
+                            disabled={!m.disponivel}
+                            onClick={() => {
+                              void Dados.encerrarMentoria(m.id)
+                                .then((x) => { if (x) substituir(x) })
+                            }}
+                          >
+                            {m.disponivel ? 'Encerrar a oferta' : 'Encerrada'}
+                          </button>
+                        ) : (
+                          <button
+                            className={m.solicitei
+                              ? 'botao botao--pequeno' : 'botao botao--discreto botao--pequeno'}
+                            disabled={!m.disponivel || m.solicitei}
+                            title={m.disponivel ? undefined : 'Sem vaga no momento'}
+                            onClick={() => {
+                              void Dados.solicitarMentoria(m.id)
+                                .then((x) => { if (x) substituir(x) })
+                            }}
+                          >
+                            {m.solicitei ? 'Solicitada' : 'Solicitar'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -150,5 +194,92 @@ export function Mentoria() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * Oferecer mentoria.
+ *
+ * <p>O campo do responsável é obrigatório e vem preenchido com quem está
+ * logado: mentoria assinada por "a atlética" é mentoria que ninguém atende.
+ * Quem recebe o pedido precisa saber a quem chamar.</p>
+ */
+function FormularioDeMentoria({ minha, nomeSugerido, aoOfertar, aoCancelar }: {
+  minha: AtleticaResumo
+  nomeSugerido: string
+  aoOfertar: (oferta: OfertaDeMentoria) => void
+  aoCancelar: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [area, setArea] = useState<AreaDeConhecimento>('GESTAO')
+  const [responsavel, setResponsavel] = useState(nomeSugerido)
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const oferta = await Dados.ofertarMentoria(minha, {
+      titulo: titulo.trim(),
+      descricao: descricao.trim(),
+      area,
+      responsavelNome: responsavel.trim(),
+    })
+    setSalvando(false)
+    aoOfertar(oferta)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Oferecer mentoria</h3>
+      <p className="fraco">
+        Mentoria é acompanhamento, não resposta avulsa — costuma durar um
+        semestre. Se a dúvida é pontual, o lugar dela é em Pedidos de ajuda.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">No que vocês podem acompanhar</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Primeiro interatlética: da inscrição ao relatório" />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que está incluído</span>
+        <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                  required
+                  placeholder="Quantos encontros, o que vocês revisam junto, o que esperam da outra atlética." />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Área</span>
+          <select value={area}
+                  onChange={(e) => setArea(e.target.value as AreaDeConhecimento)}>
+            {(Object.keys(AREA) as AreaDeConhecimento[]).map((a) => (
+              <option key={a} value={a}>{AREA[a]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Quem atende</span>
+          <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)}
+                 required maxLength={120} placeholder="Nome de quem vai acompanhar" />
+        </label>
+      </div>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !descricao.trim()
+                  || !responsavel.trim()}>
+          {salvando ? 'Publicando…' : 'Publicar para a rede'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

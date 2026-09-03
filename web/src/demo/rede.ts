@@ -412,6 +412,7 @@ export const MENTORIAS: OfertaDeMentoria[] = [
       + 'e acesso aos nossos modelos de regulamento e planilha de custo.',
     responsavelNome: 'Rafael Bandeira',
     atleticasAtendidas: 5,
+    solicitei: false,
     disponivel: true,
   },
   {
@@ -424,6 +425,7 @@ export const MENTORIAS: OfertaDeMentoria[] = [
       + 'a montar a rotina de fechamento mensal.',
     responsavelNome: 'Beatriz Nogueira',
     atleticasAtendidas: 8,
+    solicitei: false,
     disponivel: true,
   },
   {
@@ -436,6 +438,7 @@ export const MENTORIAS: OfertaDeMentoria[] = [
       + 'de você enviar.',
     responsavelNome: 'Gustavo Peixoto',
     atleticasAtendidas: 11,
+    solicitei: false,
     disponivel: true,
   },
   {
@@ -446,6 +449,7 @@ export const MENTORIAS: OfertaDeMentoria[] = [
     descricao: 'Para atlética que está se formalizando. Revisamos o estatuto e o edital.',
     responsavelNome: 'Diego Marinho',
     atleticasAtendidas: 6,
+    solicitei: false,
     disponivel: false,
   },
   {
@@ -456,6 +460,7 @@ export const MENTORIAS: OfertaDeMentoria[] = [
     descricao: 'Formato de seletiva, regulamento, transmissão simples e retenção de jogador.',
     responsavelNome: 'Camila Toledo',
     atleticasAtendidas: 3,
+    solicitei: false,
     disponivel: true,
   },
 ]

@@ -11,7 +11,7 @@ import {
   Vazio,
 } from '../ui/componentes'
 import { useCorDaAtletica } from '../ui/useCorDaAtletica'
-import { dataEHora, quando } from '../formatos'
+import { dataEHora, plural, quando } from '../formatos'
 import { useSessao } from '../sessao/SessaoContexto'
 
 /**
@@ -125,7 +125,7 @@ export function AtleticaPublica() {
                               <div className="fraco">{equipe.modalidade}</div>
                             </div>
                             <span className="etiqueta">
-                              {equipe.elenco.length} atletas
+                              {plural(equipe.elenco.length, 'atleta')}
                             </span>
                           </div>
                         </div>

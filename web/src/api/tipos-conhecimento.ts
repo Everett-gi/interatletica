@@ -34,6 +34,9 @@ export interface Guia {
   secoes: { titulo: string; corpo: string }[]
   salvamentos: number
   util: number
+  /** Marcadores meus sobre conteudo da rede: guardei, achei util. */
+  salvo: boolean
+  marqueiUtil: boolean
 }
 
 export type FormatoDeModelo = 'DOCX' | 'XLSX' | 'PDF' | 'TEXTO' | 'CHECKLIST'
@@ -137,6 +140,8 @@ export interface OfertaDeMentoria {
   responsavelNome: string
   atleticasAtendidas: number
   disponivel: boolean
+  /** Minha atletica ja pediu esta mentoria. */
+  solicitei: boolean
 }
 
 export type HabilidadeDeTalento =

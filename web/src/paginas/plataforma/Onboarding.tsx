@@ -4,7 +4,7 @@ import type { PassoDeOnboarding } from '../../api/tipos-plataforma'
 import { Conteudo, Esqueleto, useBusca } from '../../ui/componentes'
 import { CabecalhoDePagina, Progresso, Secao } from '../../ui/pagina'
 import { Icone } from '../../ui/icones'
-import { percentual } from '../../formatos'
+import { percentual, plural } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
 /**
@@ -52,7 +52,7 @@ export function Onboarding() {
                 <div className="linha entre" style={{ marginBottom: '0.6rem' }}>
                   <div>
                     <strong style={{ fontSize: '1.05rem' }}>
-                      {feitos} de {lista.length} passos concluídos
+                      {feitos} de {plural(lista.length, 'passo')} {feitos === 1 ? 'concluído' : 'concluídos'}
                     </strong>
                     <div className="fraco">
                       {proximo

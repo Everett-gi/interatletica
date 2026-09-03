@@ -4,7 +4,7 @@ import type { Reuniao } from '../../../api/tipos-gestao'
 import { Avatar, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataPorExtenso, hora, quando } from '../../../formatos'
+import { dataPorExtenso, hora, plural, quando } from '../../../formatos'
 
 /**
  * Uma reunião: pauta, participantes, ata e o que saiu dela.
@@ -101,7 +101,7 @@ export function DetalheDaReuniao() {
                             <hr className="divisor" />
                             <div className="linha entre">
                               <span className="fraco">
-                                {r.tarefasGeradas} tarefas saíram desta reunião
+                                {plural(r.tarefasGeradas, 'tarefa')} {r.tarefasGeradas === 1 ? 'saiu' : 'saíram'} desta reunião
                               </span>
                               <Link to={`/hub/${slug}/tarefas`}
                                     className="botao botao--discreto botao--pequeno">

@@ -44,9 +44,15 @@ export function DetalheDoGuia() {
                 ]}
                 etiqueta={<span className="etiqueta">{AREA[g.area]}</span>}
                 acoes={
-                  <button className="botao botao--discreto" disabled
-                          title="Salvar chega com a API conectada">
-                    <Icone nome="documentos" tamanho={16} /> Salvar
+                  <button
+                    className={g.salvo ? 'botao' : 'botao botao--discreto'}
+                    aria-pressed={g.salvo}
+                    onClick={() => {
+                      void Dados.alternarGuiaSalvo(g.id).then(guia.definir)
+                    }}
+                  >
+                    <Icone nome={g.salvo ? 'certo' : 'documentos'} tamanho={16} />{' '}
+                    {g.salvo ? 'Guardado' : 'Guardar'}
                   </button>
                 }
               />
@@ -72,9 +78,15 @@ export function DetalheDoGuia() {
                           {g.util} atléticas marcaram como útil.
                         </div>
                       </div>
-                      <button className="botao botao--discreto" disabled
-                              title="Avaliar chega com a API conectada">
-                        <Icone nome="certo" tamanho={16} /> Foi útil
+                      <button
+                        className={g.marqueiUtil ? 'botao' : 'botao botao--discreto'}
+                        aria-pressed={g.marqueiUtil}
+                        onClick={() => {
+                          void Dados.alternarGuiaUtil(g.id).then(guia.definir)
+                        }}
+                      >
+                        <Icone nome="certo" tamanho={16} />{' '}
+                        {g.marqueiUtil ? 'Você marcou' : 'Foi útil'}
                       </button>
                     </div>
                   </div>

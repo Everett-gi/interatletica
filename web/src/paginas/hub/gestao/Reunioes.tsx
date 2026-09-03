@@ -6,7 +6,7 @@ import type { Membro } from '../../../api/tipos'
 import { Avatar, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, hora, quando } from '../../../formatos'
+import { dataEHora, hora, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 /**
@@ -105,9 +105,9 @@ export function Reunioes() {
                         <div style={{ minWidth: 0 }}>
                           <strong>{r.titulo}</strong>
                           <div className="fraco">
-                            {dataEHora(r.inicioEm)} · {r.pautas.length}{' '}
-                            {r.pautas.length === 1 ? 'pauta' : 'pautas'} ·{' '}
-                            {r.tarefasGeradas} tarefas geradas
+                            {dataEHora(r.inicioEm)} · {plural(r.pautas.length, 'pauta')}{' '}
+                            · {plural(r.tarefasGeradas, 'tarefa')}{' '}
+                            {r.tarefasGeradas === 1 ? 'gerada' : 'geradas'}
                           </div>
                         </div>
                         <span className={`etiqueta ${r.ata ? 'etiqueta--sucesso' : 'etiqueta--alerta'}`}>
@@ -148,13 +148,8 @@ function CartaoDeReuniao({ reuniao, slug, destaque }: {
       </div>
 
       <div className="linha" style={{ gap: '0.35rem', marginBottom: '0.8rem' }}>
-        <span className="etiqueta">
-          {reuniao.convocados.length}{' '}
-          {reuniao.convocados.length === 1 ? 'convocado' : 'convocados'}
-        </span>
-        <span className="etiqueta">
-          {reuniao.pautas.length} {reuniao.pautas.length === 1 ? 'pauta' : 'pautas'}
-        </span>
+        <span className="etiqueta">{plural(reuniao.convocados.length, 'convocado')}</span>
+        <span className="etiqueta">{plural(reuniao.pautas.length, 'pauta')}</span>
         <span className="etiqueta">{minutos} min previstos</span>
       </div>
 

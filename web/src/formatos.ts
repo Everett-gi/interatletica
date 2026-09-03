@@ -136,6 +136,19 @@ export function numero(valor: number): string {
   return NUMERO.format(valor)
 }
 
+/**
+ * "1 tarefa", "2 tarefas".
+ *
+ * <p>Existe porque a demonstracao comeca vazia: numa atletica recem-criada
+ * quase todo contador passa por um, e "1 tarefas" e o tipo de detalhe que
+ * faz a plataforma inteira parecer um prototipo. O plural irregular vem no
+ * terceiro argumento — "1 mes", "2 meses".</p>
+ */
+export function plural(quantos: number, singular: string,
+                       muitos = `${singular}s`): string {
+  return `${quantos} ${quantos === 1 ? singular : muitos}`
+}
+
 /** "+18%", "−4%", "0%". O sinal vem antes porque é o que se lê primeiro. */
 export function variacao(percentual: number): string {
   const sinal = percentual > 0 ? '+' : percentual < 0 ? '−' : ''

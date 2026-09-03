@@ -4,7 +4,7 @@ import type { Viagem } from '../../../api/tipos-esportes'
 import { Conteudo, Esqueleto, Metrica, Previa, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Progresso, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, dinheiro, quando } from '../../../formatos'
+import { dataEHora, dinheiro, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 /**
@@ -148,7 +148,7 @@ function CartaoDeViagem({ viagem }: { viagem: Viagem }) {
       <div style={{ marginBottom: '0.6rem' }}>
         <div className="linha entre" style={{ marginBottom: '0.2rem' }}>
           <span className="fraco">Ocupação</span>
-          <span className="fraco">{viagem.passageiros} de {viagem.vagas} vagas</span>
+          <span className="fraco">{viagem.passageiros} de {plural(viagem.vagas, 'vaga')}</span>
         </div>
         <Progresso proporcao={ocupacao} tom={ocupacao >= 1 ? 'sucesso' : undefined} />
       </div>

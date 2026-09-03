@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Noticia, StatusDaPublicacao } from '../../../api/tipos-comunicacao'
@@ -33,9 +33,17 @@ export function Noticias() {
   const { podeAtuarComo } = useSessao()
   const diretor = podeAtuarComo(slug, 'DIRETOR')
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
+  const { perfil } = useSessao()
   const [aberta, setAberta] = useState<Noticia | null>(null)
+  const [escrevendo, setEscrevendo] = useState(false)
 
   const noticias = useBusca<Noticia[]>(() => Dados.noticias(slug), [slug])
+
+  /** Troca a notícia na lista e, se for a aberta, também na gaveta. */
+  const substituir = (n: Noticia) => {
+    noticias.definir((noticias.dados ?? []).map((x) => (x.id === n.id ? n : x)))
+    setAberta((atual) => (atual && atual.id === n.id ? n : atual))
+  }
 
   return (
     <div>
@@ -48,8 +56,7 @@ export function Noticias() {
               Mural de avisos
             </Link>
             {diretor ? (
-              <button className="botao" disabled
-                      title="Escrever chega com a API conectada">
+              <button className="botao" onClick={() => setEscrevendo((v) => !v)}>
                 <Icone nome="mais" tamanho={16} /> Nova notícia
               </button>
             ) : null}
@@ -58,6 +65,19 @@ export function Noticias() {
       />
 
       <Previa oQueFalta="Escrever e publicar notícia ainda não chegam ao servidor." />
+
+      {escrevendo ? (
+        <FormularioDeNoticia
+          slug={slug}
+          autorSugerido={perfil?.nome ?? ''}
+          aoEscrever={(nova) => {
+            noticias.definir([nova, ...(noticias.dados ?? [])])
+            setEscrevendo(false)
+            setAberta(nova)
+          }}
+          aoCancelar={() => setEscrevendo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={noticias}
@@ -237,6 +257,22 @@ export function Noticias() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Publicar é o segundo gesto, separado de escrever: o que
+                      a atlética manda para fora costuma passar por mais de um
+                      par de olhos. */}
+                  {diretor && aberta.status !== 'PUBLICADO' ? (
+                    <button
+                      className="botao botao--largo"
+                      style={{ marginTop: '1rem' }}
+                      onClick={() => {
+                        void Dados.publicarNoticia(aberta.id)
+                          .then((n) => { if (n) substituir(n) })
+                      }}
+                    >
+                      <Icone nome="certo" tamanho={16} /> Publicar agora
+                    </button>
+                  ) : null}
                 </Gaveta>
               ) : null}
             </>
@@ -244,5 +280,101 @@ export function Noticias() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * Escrever uma notícia.
+ *
+ * <p>A chamada é obrigatória e separada do corpo porque é ela que aparece
+ * na lista, no card compartilhado e na página pública. Notícia sem chamada
+ * vira título solto num feed — e ninguém clica em título solto.</p>
+ */
+function FormularioDeNoticia({ slug, autorSugerido, aoEscrever, aoCancelar }: {
+  slug: string
+  autorSugerido: string
+  aoEscrever: (noticia: Noticia) => void
+  aoCancelar: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [chamada, setChamada] = useState('')
+  const [corpo, setCorpo] = useState('')
+  const [autor, setAutor] = useState(autorSugerido)
+  const [etiquetas, setEtiquetas] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const noticia = await Dados.escreverNoticia(slug, {
+      titulo: titulo.trim(),
+      chamada: chamada.trim(),
+      corpo: corpo.trim(),
+      autorNome: autor.trim(),
+      etiquetas: etiquetas.split(',').map((x) => x.trim()).filter((x) => x !== ''),
+    })
+    setSalvando(false)
+    aoEscrever(noticia)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Nova notícia</h3>
+      <p className="fraco">
+        Nasce como rascunho, igual ao evento. Publicar é um segundo gesto,
+        depois de alguém reler.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">Título</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Fênix leva o vôlei feminino no Interatlética de Primavera" />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Chamada</span>
+        <input value={chamada} onChange={(e) => setChamada(e.target.value)}
+               required maxLength={200}
+               placeholder="Duas viradas em três sets e o primeiro título da equipe." />
+        <span className="campo__dica">
+          É o que aparece na lista e no link compartilhado.
+        </span>
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Texto</span>
+        <textarea value={corpo} onChange={(e) => setCorpo(e.target.value)}
+                  required rows={7}
+                  placeholder="O que aconteceu, quem participou, o que vem depois." />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Assinatura</span>
+          <input value={autor} onChange={(e) => setAutor(e.target.value)}
+                 required maxLength={120} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Etiquetas (opcional)</span>
+          <input value={etiquetas} onChange={(e) => setEtiquetas(e.target.value)}
+                 maxLength={160} placeholder="vôlei, interatlética" />
+          <span className="campo__dica">Separe por vírgula.</span>
+        </label>
+      </div>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !chamada.trim()
+                  || !corpo.trim() || !autor.trim()}>
+          {salvando ? 'Salvando…' : 'Salvar rascunho'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

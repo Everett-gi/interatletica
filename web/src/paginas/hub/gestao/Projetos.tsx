@@ -11,7 +11,7 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro, percentual, quando } from '../../../formatos'
+import { dinheiro, percentual, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 export const STATUS_DO_PROJETO: Record<StatusDoProjeto, { rotulo: string; classe: string }> = {
@@ -171,7 +171,7 @@ export function CartaoDeProjeto({ projeto, slug }: { projeto: Projeto; slug: str
 
       <div className="linha entre" style={{ marginBottom: '0.3rem' }}>
         <span className="fraco">
-          {projeto.tarefasConcluidas} de {projeto.tarefasTotal} tarefas
+          {projeto.tarefasConcluidas} de {plural(projeto.tarefasTotal, 'etapa')}
         </span>
         <span className="fraco">{percentual(projeto.progresso)}</span>
       </div>

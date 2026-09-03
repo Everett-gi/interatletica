@@ -4,7 +4,7 @@ import type { Comunidade, PostDaComunidade } from '../../../api/tipos-conhecimen
 import { Avatar, Brasao, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 
 interface Composicao {
   comunidade: Comunidade | null
@@ -119,7 +119,7 @@ export function DetalheDaComunidade() {
                               </span>
                               <span className="linha fraco" style={{ gap: '0.3rem' }}>
                                 <Icone nome="comunidades" tamanho={14} />
-                                {post.respostas} respostas
+                                {plural(post.respostas, 'resposta')}
                               </span>
                             </div>
                           </article>

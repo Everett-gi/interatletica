@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { HabilidadeDeTalento, Talento } from '../../../api/tipos-conhecimento'
 import { Avatar, Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
+import { useSessao } from '../../../sessao/SessaoContexto'
 
 const HABILIDADE: Record<HabilidadeDeTalento, string> = {
   DESIGN: 'Design',
@@ -30,10 +31,14 @@ type Filtro = 'TODAS' | HabilidadeDeTalento
  */
 export function Talentos() {
   const { slug = '' } = useParams()
+  const { perfil, vinculo } = useSessao()
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
   const [soDisponiveis, setSoDisponiveis] = useState(false)
+  const [editando, setEditando] = useState(false)
 
   const talentos = useBusca<Talento[]>(() => Dados.talentos(), [])
+  const minhaFicha = (talentos.dados ?? []).find(
+    (t) => t.usuarioId === perfil?.id) ?? null
 
   return (
     <div>
@@ -44,13 +49,43 @@ export function Talentos() {
           { rotulo: 'Conhecimento', para: `/hub/${slug}/conhecimento` },
           { rotulo: 'Talentos' },
         ]}
-        acoes={
-          <button className="botao botao--discreto" disabled
-                  title="Entrar no banco chega com a API conectada">
-            <Icone nome="mais" tamanho={16} /> Entrar no banco
-          </button>
-        }
+        acoes={perfil ? (
+          minhaFicha ? (
+            <button
+              className="botao botao--discreto"
+              onClick={() => {
+                void Dados.sairDoBancoDeTalentos(perfil.id).then(() => {
+                  talentos.definir(
+                    (talentos.dados ?? []).filter((t) => t.usuarioId !== perfil.id))
+                })
+              }}
+            >
+              <Icone nome="fechar" tamanho={16} /> Sair do banco
+            </button>
+          ) : (
+            <button className="botao botao--discreto"
+                    onClick={() => setEditando((v) => !v)}>
+              <Icone nome="mais" tamanho={16} /> Entrar no banco
+            </button>
+          )
+        ) : undefined}
       />
+
+      {editando && perfil ? (
+        <FormularioDeTalento
+          pessoa={{
+            usuarioId: perfil.id,
+            nome: perfil.nome,
+            avatarUrl: perfil.avatarUrl,
+            atletica: vinculo(slug)?.atletica ?? null,
+          }}
+          aoEntrar={(talento) => {
+            talentos.definir([talento, ...(talentos.dados ?? [])])
+            setEditando(false)
+          }}
+          aoCancelar={() => setEditando(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={talentos}
@@ -68,6 +103,11 @@ export function Talentos() {
                   Se você faz design, fotografia, vídeo ou revisão de documento,
                   entre no banco. É como outra atlética vai te achar.
                 </p>
+                {perfil && !minhaFicha && !editando ? (
+                  <button className="botao" onClick={() => setEditando(true)}>
+                    <Icone nome="mais" tamanho={16} /> Entrar no banco
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -175,5 +215,99 @@ export function Talentos() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * A ficha do banco de talentos.
+ *
+ * <p>Pede pelo menos uma habilidade e uma descrição curta. Ficha com dez
+ * habilidades marcadas e nenhuma frase é ficha que ninguém procura — quem
+ * busca quer ler "faço arte de camisa e cartaz, uso Illustrator", não uma
+ * lista de etiquetas.</p>
+ */
+function FormularioDeTalento({ pessoa, aoEntrar, aoCancelar }: {
+  pessoa: {
+    usuarioId: string
+    nome: string
+    avatarUrl: string | null
+    atletica: Talento['atletica']
+  }
+  aoEntrar: (talento: Talento) => void
+  aoCancelar: () => void
+}) {
+  const [habilidades, setHabilidades] = useState<HabilidadeDeTalento[]>([])
+  const [descricao, setDescricao] = useState('')
+  const [portfolio, setPortfolio] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const alternar = (h: HabilidadeDeTalento) => setHabilidades(
+    (atual) => (atual.includes(h) ? atual.filter((x) => x !== h) : [...atual, h]))
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const talento = await Dados.entrarNoBancoDeTalentos(pessoa, {
+      habilidades,
+      descricao: descricao.trim(),
+      portfolioUrl: portfolio.trim() === '' ? null : portfolio.trim(),
+    })
+    setSalvando(false)
+    aoEntrar(talento)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Entrar no banco de talentos</h3>
+      <p className="fraco">
+        A ficha é sua, não da atlética: ela continua com você se um dia mudar
+        de vínculo. Quem procura vê o seu nome e o seu contato pela rede.
+      </p>
+
+      <div className="campo">
+        <span className="campo__rotulo">O que você faz</span>
+        <div className="linha" style={{ flexWrap: 'wrap', gap: '0.4rem' }}>
+          {(Object.keys(HABILIDADE) as HabilidadeDeTalento[]).map((h) => (
+            <button
+              key={h}
+              type="button"
+              className="chip"
+              aria-pressed={habilidades.includes(h)}
+              onClick={() => alternar(h)}
+            >
+              {HABILIDADE[h]}
+            </button>
+          ))}
+        </div>
+        <span className="campo__dica">
+          Marque só o que você entrega de verdade. Duas bem marcadas valem mais
+          que nove.
+        </span>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Em uma frase</span>
+        <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                  required rows={3}
+                  placeholder="Faço arte de camisa, cartaz e post. Uso Illustrator e entrego em uma semana." />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Portfólio (opcional)</span>
+        <input value={portfolio} onChange={(e) => setPortfolio(e.target.value)}
+               maxLength={200} placeholder="https://…" />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || habilidades.length === 0 || !descricao.trim()}>
+          {salvando ? 'Entrando…' : 'Entrar no banco'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

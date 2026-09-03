@@ -11,7 +11,7 @@ import {
   Segmentado,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 
 const SITUACAO: Record<SituacaoDoAtleta, { rotulo: string; classe: string }> = {
   ATIVO: { rotulo: 'ativo', classe: 'etiqueta--sucesso' },
@@ -118,7 +118,7 @@ export function Atletas() {
               {pendentes.length > 0 ? (
                 <div className="aviso aviso--alerta" style={{ marginBottom: '1.1rem' }}>
                   <strong>
-                    {pendentes.length} atletas sem documentação em dia
+                    {plural(pendentes.length, 'atleta')} sem documentação em dia
                   </strong>
                   <p className="fraco" style={{ margin: '0.25rem 0 0' }}>
                     Cobrar matrícula e atestado na véspera do campeonato é como a

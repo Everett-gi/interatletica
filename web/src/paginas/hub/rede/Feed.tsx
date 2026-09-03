@@ -5,7 +5,7 @@ import type { PostDaRede, TipoDePostDaRede } from '../../../api/tipos-conhecimen
 import { Avatar, Brasao, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Chips, Confirmacao, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 
 const TIPO: Record<TipoDePostDaRede, { rotulo: string; icone: NomeDoIcone; classe: string }> = {
   CONQUISTA: { rotulo: 'Conquista', icone: 'campeonatos', classe: 'etiqueta--sucesso' },
@@ -138,7 +138,7 @@ export function Feed() {
                           {post.respostas > 0 ? (
                             <span className="linha fraco" style={{ gap: '0.3rem' }}>
                               <Icone nome="comunidades" tamanho={14} />
-                              {post.respostas} respostas
+                              {plural(post.respostas, 'resposta')}
                             </span>
                           ) : null}
                           {/* Denúncia discreta (§93): precisa existir em todo

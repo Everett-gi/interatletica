@@ -6,6 +6,7 @@ import { Avatar, Conteudo, Esqueleto, Metrica, Previa, useBusca } from '../../ui
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../ui/pagina'
 import { Icone } from '../../ui/icones'
 import { useSessao } from '../../sessao/SessaoContexto'
+import { plural } from '../../formatos'
 
 const FUNCAO: Record<FuncaoNaEquipe, { rotulo: string; classe: string }> = {
   CAPITAO: { rotulo: 'Capitão', classe: 'etiqueta--acento' },
@@ -236,7 +237,7 @@ function CartaoDeEquipe({ equipe, slug }: { equipe: Equipe; slug: string }) {
           </Link>
           <div className="fraco">{equipe.modalidade}</div>
         </div>
-        <span className="etiqueta">{equipe.elenco.length} atletas</span>
+        <span className="etiqueta">{plural(equipe.elenco.length, 'atleta')}</span>
       </div>
 
       {equipe.elenco.length === 0 ? (

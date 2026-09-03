@@ -28,6 +28,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[0],
     autorNome: 'Marina Alencar',
     salvamentos: 184,
+    salvo: false,
+    marqueiUtil: false,
     util: 156,
     secoes: [
       {
@@ -92,6 +94,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[2],
     autorNome: 'Beatriz Nogueira',
     salvamentos: 142,
+    salvo: false,
+    marqueiUtil: false,
     util: 121,
     secoes: [
       {
@@ -129,6 +133,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[4],
     autorNome: 'Gustavo Peixoto',
     salvamentos: 210,
+    salvo: false,
+    marqueiUtil: false,
     util: 178,
     secoes: [
       {
@@ -173,6 +179,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[1],
     autorNome: 'Rafael Bandeira',
     salvamentos: 167,
+    salvo: false,
+    marqueiUtil: false,
     util: 149,
     secoes: [
       {
@@ -208,6 +216,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[5],
     autorNome: 'Thiago Rezende',
     salvamentos: 98,
+    salvo: false,
+    marqueiUtil: false,
     util: 84,
     secoes: [
       {
@@ -241,6 +251,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[3],
     autorNome: 'Camila Toledo',
     salvamentos: 76,
+    salvo: false,
+    marqueiUtil: false,
     util: 61,
     secoes: [
       {
@@ -269,6 +281,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[2],
     autorNome: 'Beatriz Nogueira',
     salvamentos: 133,
+    salvo: false,
+    marqueiUtil: false,
     util: 112,
     secoes: [
       {
@@ -302,6 +316,8 @@ export const GUIAS: Guia[] = [
     autorAtletica: ATLETICAS[4],
     autorNome: 'Isabela Cunha',
     salvamentos: 89,
+    salvo: false,
+    marqueiUtil: false,
     util: 71,
     secoes: [
       {

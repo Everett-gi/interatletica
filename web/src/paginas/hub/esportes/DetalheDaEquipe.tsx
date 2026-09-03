@@ -7,7 +7,7 @@ import type { Membro } from '../../../api/tipos'
 import { Avatar, Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, percentual, quando } from '../../../formatos'
+import { dataEHora, percentual, plural, quando } from '../../../formatos'
 import { atleticaPorSlug } from '../../../demo/dados'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
@@ -81,7 +81,7 @@ export function DetalheDaEquipe() {
             <>
               <CabecalhoDePagina
                 titulo={equipe.nome}
-                descricao={`${equipe.modalidade} · ${equipe.elenco.length} atletas`}
+                descricao={`${equipe.modalidade} · ${plural(equipe.elenco.length, 'atleta')}`}
                 trilha={[
                   { rotulo: 'Equipes', para: `/hub/${slug}/equipes` },
                   { rotulo: equipe.nome },

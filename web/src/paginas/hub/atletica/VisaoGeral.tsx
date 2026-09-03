@@ -23,7 +23,7 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, dinheiro, percentual, quando } from '../../../formatos'
+import { dataEHora, dinheiro, percentual, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 interface Composicao {
@@ -134,7 +134,7 @@ export function VisaoGeral() {
                          valor={ativos.length} detalhe="com vínculo ativo" />
                 <Metrica rotulo="Equipes" icone="equipes" para={`${base}/equipes`}
                          valor={d.equipes.length}
-                         detalhe={`${modalidades.length} modalidades`} />
+                         detalhe={plural(modalidades.length, 'modalidade')} />
                 <Metrica rotulo="Eventos no ar" icone="eventos" para={`${base}/eventos`}
                          valor={d.painel.eventosPublicados} />
                 <Metrica rotulo="Projetos" icone="projetos" para={`${base}/projetos`}

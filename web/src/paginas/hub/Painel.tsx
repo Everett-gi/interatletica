@@ -17,7 +17,7 @@ import {
 } from '../../ui/componentes'
 import { EstadoVazio, Progresso, Secao } from '../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../ui/icones'
-import { dataEHora, dinheiro, percentual, quando } from '../../formatos'
+import { dataEHora, dinheiro, percentual, plural, quando } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
 /**
@@ -297,7 +297,8 @@ function ProximasAtividades({ slug, dados }: { slug: string; dados: Composicao }
         id: r.id,
         titulo: r.titulo,
         quandoEm: r.inicioEm,
-        detalhe: `${r.convocados.length} convocados · ${r.pautas.length} pautas`,
+        detalhe: `${plural(r.convocados.length, 'convocado')}`
+          + ` · ${plural(r.pautas.length, 'pauta')}`,
         para: `/hub/${slug}/reunioes/${r.id}`,
         icone: 'reunioes' as NomeDoIcone,
       })),
@@ -412,7 +413,7 @@ function MinhasPendencias({ slug, dados, funcao }: {
           {funcao !== 'MEMBRO' && semDono.length > 0 ? (
             <Link to={`/hub/${slug}/tarefas`} className="aviso aviso--alerta"
                   style={{ display: 'block', color: 'inherit' }}>
-              <strong>{semDono.length} tarefas sem responsável</strong>
+              <strong>{plural(semDono.length, 'tarefa')} sem responsável</strong>
               <div className="fraco">
                 Tarefa sem nome é tarefa de ninguém. Atribua antes que vire atraso.
               </div>
@@ -448,7 +449,7 @@ function ProjetosEmAndamento({ slug, dados }: { slug: string; dados: Composicao 
             <Progresso proporcao={p.progresso} />
             <div className="linha entre" style={{ marginTop: '0.45rem' }}>
               <span className="fraco">
-                {p.tarefasConcluidas} de {p.tarefasTotal} tarefas · {p.area}
+                {p.tarefasConcluidas} de {plural(p.tarefasTotal, 'etapa')} · {p.area}
               </span>
               {p.prazo ? <span className="fraco">prazo {quando(p.prazo)}</span> : null}
             </div>

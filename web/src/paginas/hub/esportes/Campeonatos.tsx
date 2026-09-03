@@ -5,6 +5,7 @@ import { Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Progresso, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { useSessao } from '../../../sessao/SessaoContexto'
+import { plural } from '../../../formatos'
 
 const STATUS: Record<Torneio['status'], { rotulo: string; classe: string }> = {
   INSCRICOES: { rotulo: 'Inscrições abertas', classe: 'etiqueta--acento' },
@@ -107,7 +108,7 @@ export function Campeonatos() {
 
                         <h3 style={{ marginBottom: '0.2rem' }}>{t.nome}</h3>
                         <div className="fraco" style={{ marginBottom: '0.9rem' }}>
-                          {FORMATO[t.formato]} · {t.vagas} vagas
+                          {FORMATO[t.formato]} · {plural(t.vagas, 'vaga')}
                         </div>
 
                         <div className="linha" style={{ gap: '1.4rem',

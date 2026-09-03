@@ -7,6 +7,7 @@ import { CabecalhoDePagina, Confirmacao, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { atleticaPorSlug } from '../../../demo/dados'
 import { TIPO_DE_PROJETO } from './Projetos'
+import { plural } from '../../../formatos'
 
 /**
  * Começar um projeto a partir de um modelo (§20).
@@ -110,10 +111,10 @@ export function NovoProjeto() {
                       <div className="linha" style={{ gap: '0.35rem',
                                                       marginBottom: '0.7rem' }}>
                         <span className="etiqueta etiqueta--acento">
-                          {modelo.tarefas.length} passos
+                          {plural(modelo.tarefas.length, 'passo')}
                         </span>
-                        <span className="etiqueta">{modelo.marcos.length} marcos</span>
-                        <span className="etiqueta">{modelo.duracaoEmDias} dias</span>
+                        <span className="etiqueta">{plural(modelo.marcos.length, 'marco')}</span>
+                        <span className="etiqueta">{plural(modelo.duracaoEmDias, 'dia')}</span>
                       </div>
 
                       {origem ? (
@@ -185,11 +186,12 @@ export function NovoProjeto() {
       {confirmando ? (
         <Confirmacao
           titulo={escolhido
-            ? `Trazer o roteiro de ${escolhido.tarefas.length} passos?`
+            ? `Trazer o roteiro de ${plural(escolhido.tarefas.length, 'passo')}?`
             : 'Criar projeto em branco?'}
           consequencia={escolhido
             ? `O projeto “${nome.trim() || escolhido.nome}” nasce com o roteiro `
-              + `de ${escolhido.tarefas.length} passos e ${escolhido.marcos.length} marcos, `
+              + `de ${plural(escolhido.tarefas.length, 'passo')} e `
+              + `${plural(escolhido.marcos.length, 'marco')}, `
               + 'para marcar conforme resolver. O progresso do projeto sai daí. '
               + 'O que precisar de responsável e prazo você promove a tarefa no quadro.'
             : 'O projeto será criado sem roteiro nem marcos.'}

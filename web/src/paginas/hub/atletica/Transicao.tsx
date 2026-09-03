@@ -11,7 +11,7 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../../ui/icones'
-import { percentual, quando } from '../../../formatos'
+import { percentual, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 const AREA: Record<AreaDaTransicao, { rotulo: string; icone: NomeDoIcone; porque: string }> = {
@@ -118,7 +118,7 @@ export function Transicao() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="numero-medio">{percentual(proporcao)}</div>
-                    <div className="fraco">{feitos} de {t.itens.length} itens</div>
+                    <div className="fraco">{feitos} de {plural(t.itens.length, 'item', 'itens')}</div>
                   </div>
                 </div>
                 <Progresso proporcao={proporcao}

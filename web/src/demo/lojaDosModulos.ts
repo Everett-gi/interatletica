@@ -37,6 +37,7 @@ import type {
   AreaDeConhecimento,
   Comunidade,
   Experiencia,
+  HabilidadeDeTalento,
   Guia,
   Modelo,
   OfertaDeMentoria,
@@ -156,6 +157,9 @@ interface Estado {
   noticias: Noticia[]
   campanhas: Campanha[]
   experiencias: Experiencia[]
+  guias: Guia[]
+  mentorias: OfertaDeMentoria[]
+  talentos: Talento[]
   notificacoes: Notificacao[]
   onboarding: PassoDeOnboarding[]
 }
@@ -179,6 +183,9 @@ const estado: Estado = {
   noticias: clonar(NOTICIAS),
   campanhas: clonar(CAMPANHAS),
   experiencias: clonar(EXPERIENCIAS),
+  guias: clonar(GUIAS),
+  mentorias: clonar(MENTORIAS),
+  talentos: clonar(TALENTOS),
   notificacoes: clonar(NOTIFICACOES),
   onboarding: clonar(PASSOS_DE_ONBOARDING),
 }
@@ -317,6 +324,13 @@ export interface FatiaDosModulos {
   campanhas: unknown[]
   /** Experiências que a minha atlética publicou na rede. */
   minhasExperiencias: unknown[]
+  /** Mentorias que a minha atlética ofereceu. */
+  minhasMentorias: unknown[]
+  /** A minha ficha no banco de talentos, quando existe. */
+  meuTalento: unknown | null
+  guiasSalvos: string[]
+  guiasUteis: string[]
+  mentoriasQueSolicitei: string[]
   /** Pedidos que a minha atlética abriu. */
   meusPedidos: unknown[]
   /** Respostas minhas em pedidos de outras atléticas: `{ pedidoId: resposta[] }`. */
@@ -357,6 +371,12 @@ export function exportarFatiaDosModulos(meus: Set<string>): FatiaDosModulos {
     noticias: daMinha(estado.noticias),
     campanhas: daMinha(estado.campanhas),
     minhasExperiencias: estado.experiencias.filter((e) => meus.has(e.atletica.slug)),
+    minhasMentorias: estado.mentorias.filter((m) => meus.has(m.atletica.slug)),
+    meuTalento: estado.talentos.find(
+      (t) => t.atletica !== null && meus.has(t.atletica.slug)) ?? null,
+    guiasSalvos: estado.guias.filter((g) => g.salvo).map((g) => g.id),
+    guiasUteis: estado.guias.filter((g) => g.marqueiUtil).map((g) => g.id),
+    mentoriasQueSolicitei: estado.mentorias.filter((m) => m.solicitei).map((m) => m.id),
 
     meusPedidos: estado.pedidos.filter((p) => meus.has(p.atletica.slug)),
     respostasEmOutros: Object.fromEntries(
@@ -409,6 +429,8 @@ export function importarFatiaDosModulos(
   estado.noticias.push(...(fatia.noticias ?? []) as Noticia[])
   estado.campanhas.push(...(fatia.campanhas ?? []) as Campanha[])
   estado.experiencias.unshift(...(fatia.minhasExperiencias ?? []) as Experiencia[])
+  estado.mentorias.unshift(...(fatia.minhasMentorias ?? []) as OfertaDeMentoria[])
+  if (fatia.meuTalento) estado.talentos.unshift(fatia.meuTalento as Talento)
   estado.pedidos.unshift(...(fatia.meusPedidos ?? []) as PedidoDeAjuda[])
 
   Object.entries(fatia.respostasEmOutros ?? {}).forEach(([pedidoId, respostas]) => {
@@ -448,6 +470,18 @@ export function importarFatiaDosModulos(
     }
   })
   marcar(estado.notificacoes, fatia.notificacoesLidas, (n) => { n.lida = true })
+  marcar(estado.guias, fatia.guiasSalvos, (g) => {
+    g.salvo = true
+    g.salvamentos += 1
+  })
+  marcar(estado.guias, fatia.guiasUteis, (g) => {
+    g.marqueiUtil = true
+    g.util += 1
+  })
+  marcar(estado.mentorias, fatia.mentoriasQueSolicitei, (m) => {
+    m.solicitei = true
+    m.atleticasAtendidas += 1
+  })
   marcar(estado.transicao.itens, fatia.itensDaTransicaoConcluidos,
     (i) => { i.concluido = true })
 
@@ -531,7 +565,7 @@ function indexar(contextoSlug: string): ResultadoDeBusca[] {
     destino: `${base}/rede/ajuda/${p.id}`, noContexto: p.atletica.slug === contextoSlug,
   }))
 
-  GUIAS.forEach((g) => itens.push({
+  estado.guias.forEach((g) => itens.push({
     id: `bgu-${g.id}`, tipo: 'GUIA', titulo: g.titulo, detalhe: g.resumo,
     destino: `${base}/conhecimento/guias/${g.id}`, noContexto: false,
   }))
@@ -609,6 +643,16 @@ export const lojaDosModulos = {
     estado.compras.forEach((c) => { c.participo = false })
     estado.decisoes.forEach((d) => { d.meuVoto = null })
     estado.notificacoes.forEach((n) => { n.lida = false })
+    estado.guias.forEach((g) => {
+      if (g.salvo) { g.salvo = false; g.salvamentos = Math.max(0, g.salvamentos - 1) }
+      if (g.marqueiUtil) { g.marqueiUtil = false; g.util = Math.max(0, g.util - 1) }
+    })
+    estado.mentorias.forEach((m) => {
+      if (m.solicitei) {
+        m.solicitei = false
+        m.atleticasAtendidas = Math.max(0, m.atleticasAtendidas - 1)
+      }
+    })
   },
 
   // ---------------- Gestão ----------------
@@ -904,6 +948,50 @@ export const lojaDosModulos = {
   documentos: (slug: string): Promise<Documento[]> =>
     responder(daAtletica(estado.documentos, slug)),
 
+  /**
+   * Cadastrar um item do patrimônio (§17).
+   *
+   * <p>Não precisa de foto nem de nota fiscal para existir: o inventário que
+   * só aceita cadastro completo é o inventário que ninguém preenche, e a
+   * transição de gestão descobre a caixa de som sumida tarde demais.</p>
+   */
+  cadastrarPatrimonio(slug: string, dados: {
+    nome: string
+    categoria: ItemDePatrimonio['categoria']
+    quantidade: number
+    estado: ItemDePatrimonio['estado']
+    localizacao: string | null
+    responsavelNome: string | null
+    valorEstimado: number | null
+    observacao: string | null
+  }): Promise<ItemDePatrimonio> {
+    const item: ItemDePatrimonio = {
+      id: novoId('pt'),
+      atleticaSlug: slug,
+      nome: dados.nome,
+      categoria: dados.categoria,
+      quantidade: dados.quantidade,
+      estado: dados.estado,
+      localizacao: dados.localizacao,
+      responsavelNome: dados.responsavelNome,
+      valorEstimado: dados.valorEstimado,
+      adquiridoEm: new Date().toISOString(),
+      fotoUrl: null,
+      observacao: dados.observacao,
+    }
+    estado.patrimonio.unshift(item)
+    return responderMudanca(item)
+  },
+
+  /** O estado do item muda com o uso — é o que a conferência anual registra. */
+  mudarEstadoDoItem(
+    id: string, novoEstado: ItemDePatrimonio['estado'],
+  ): Promise<ItemDePatrimonio | null> {
+    const item = estado.patrimonio.find((p) => p.id === id)
+    if (item) item.estado = novoEstado
+    return responderMudanca(item ?? null, 80)
+  },
+
   patrimonio: (slug: string): Promise<ItemDePatrimonio[]> =>
     responder(daAtletica(estado.patrimonio, slug)),
 
@@ -1115,13 +1203,128 @@ export const lojaDosModulos = {
     return responderMudanca(parceria ?? null, 70)
   },
 
-  mentorias: (): Promise<OfertaDeMentoria[]> => responder(MENTORIAS),
-  talentos: (): Promise<Talento[]> => responder(TALENTOS),
+  mentorias: (): Promise<OfertaDeMentoria[]> => responder(estado.mentorias),
+
+  /**
+   * Oferecer mentoria (§40).
+   *
+   * <p>Quem passou por uma federação, uma prestação de contas travada ou um
+   * patrocínio grande sabe coisas que não cabem num guia. A oferta nomeia
+   * uma pessoa responsável de propósito: mentoria de "a atlética" é
+   * mentoria de ninguém.</p>
+   */
+  ofertarMentoria(minha: AtleticaResumo, dados: {
+    titulo: string
+    descricao: string
+    area: AreaDeConhecimento
+    responsavelNome: string
+  }): Promise<OfertaDeMentoria> {
+    const oferta: OfertaDeMentoria = {
+      id: novoId('mn'),
+      atletica: minha,
+      area: dados.area,
+      titulo: dados.titulo,
+      descricao: dados.descricao,
+      responsavelNome: dados.responsavelNome,
+      atleticasAtendidas: 0,
+      disponivel: true,
+      solicitei: false,
+    }
+    estado.mentorias.unshift(oferta)
+    return responderMudanca(oferta)
+  },
+
+  /** Pedir a mentoria. Na demonstração para aqui; com a API vira conversa. */
+  solicitarMentoria(id: string): Promise<OfertaDeMentoria | null> {
+    const oferta = estado.mentorias.find((m) => m.id === id)
+    if (oferta && !oferta.solicitei) {
+      oferta.solicitei = true
+      oferta.atleticasAtendidas += 1
+    }
+    return responderMudanca(oferta ?? null)
+  },
+
+  /** Tirar do ar a oferta da própria atlética. */
+  encerrarMentoria(id: string): Promise<OfertaDeMentoria | null> {
+    const oferta = estado.mentorias.find((m) => m.id === id)
+    if (oferta) oferta.disponivel = false
+    return responderMudanca(oferta ?? null, 80)
+  },
+
+  talentos: (): Promise<Talento[]> => responder(estado.talentos),
+
+  /**
+   * Entrar no banco de talentos (§41).
+   *
+   * <p>O banco é de pessoas, não de atléticas: quem desenha o cartaz é uma
+   * pessoa com nome, e é ela que a outra atlética vai procurar. O vínculo
+   * aparece junto porque ajuda a achar quem está perto.</p>
+   */
+  entrarNoBancoDeTalentos(pessoa: {
+    usuarioId: string
+    nome: string
+    avatarUrl: string | null
+    atletica: AtleticaResumo | null
+  }, dados: {
+    habilidades: HabilidadeDeTalento[]
+    descricao: string
+    portfolioUrl: string | null
+  }): Promise<Talento> {
+    const existente = estado.talentos.find((t) => t.usuarioId === pessoa.usuarioId)
+    const talento: Talento = {
+      usuarioId: pessoa.usuarioId,
+      nome: pessoa.nome,
+      avatarUrl: pessoa.avatarUrl,
+      atletica: pessoa.atletica,
+      habilidades: dados.habilidades,
+      descricao: dados.descricao,
+      portfolioUrl: dados.portfolioUrl,
+      disponivel: true,
+      trabalhos: existente?.trabalhos ?? 0,
+    }
+    estado.talentos = [
+      talento,
+      ...estado.talentos.filter((t) => t.usuarioId !== pessoa.usuarioId),
+    ]
+    return responderMudanca(talento)
+  },
+
+  /** Sair do banco sem apagar o histórico de trabalhos. */
+  sairDoBancoDeTalentos(usuarioId: string): Promise<void> {
+    estado.talentos = estado.talentos.filter((t) => t.usuarioId !== usuarioId)
+    return responderMudanca(undefined, 80)
+  },
 
   // ---------------- Conhecimento ----------------
-  guias: (): Promise<Guia[]> => responder(GUIAS),
+  guias: (): Promise<Guia[]> => responder(estado.guias),
   guia: (id: string): Promise<Guia | null> =>
-    responder(GUIAS.find((g) => g.id === id) ?? null),
+    responder(estado.guias.find((g) => g.id === id) ?? null),
+
+  /**
+   * Guardar um guia para depois.
+   *
+   * <p>O contador da rede sobe junto: é ele que diz, para quem chega, quais
+   * guias outras atléticas acharam que valiam a pena. Número de salvamentos
+   * que não mexe quando alguém salva é número decorativo.</p>
+   */
+  alternarGuiaSalvo(id: string): Promise<Guia | null> {
+    const guia = estado.guias.find((g) => g.id === id)
+    if (guia) {
+      guia.salvo = !guia.salvo
+      guia.salvamentos = Math.max(0, guia.salvamentos + (guia.salvo ? 1 : -1))
+    }
+    return responderMudanca(guia ?? null, 80)
+  },
+
+  /** "Isto me ajudou" — o sinal que ordena a lista para quem vem depois. */
+  alternarGuiaUtil(id: string): Promise<Guia | null> {
+    const guia = estado.guias.find((g) => g.id === id)
+    if (guia) {
+      guia.marqueiUtil = !guia.marqueiUtil
+      guia.util = Math.max(0, guia.util + (guia.marqueiUtil ? 1 : -1))
+    }
+    return responderMudanca(guia ?? null, 80)
+  },
   modelos: (): Promise<Modelo[]> => responder(MODELOS),
   experiencias: (): Promise<Experiencia[]> => responder(estado.experiencias),
   experiencia: (id: string): Promise<Experiencia | null> =>
@@ -1196,6 +1399,46 @@ export const lojaDosModulos = {
   // ---------------- Comunicação ----------------
   noticias: (slug: string): Promise<Noticia[]> =>
     responder(daAtletica(estado.noticias, slug)),
+  /**
+   * Escrever uma notícia (§57).
+   *
+   * <p>Nasce como rascunho, igual ao evento: o que a atlética publica para
+   * fora costuma passar por mais de um par de olhos, e um botão que publica
+   * direto do editor é como sai a nota com o nome do patrocinador errado.</p>
+   */
+  escreverNoticia(slug: string, dados: {
+    titulo: string
+    chamada: string
+    corpo: string
+    autorNome: string
+    etiquetas: string[]
+  }): Promise<Noticia> {
+    const noticia: Noticia = {
+      id: novoId('nt'),
+      atleticaSlug: slug,
+      titulo: dados.titulo,
+      chamada: dados.chamada,
+      corpo: dados.corpo,
+      capaUrl: null,
+      autorNome: dados.autorNome,
+      publicadaEm: null,
+      status: 'PRODUCAO',
+      destaque: false,
+      etiquetas: dados.etiquetas,
+    }
+    estado.noticias.unshift(noticia)
+    return responderMudanca(noticia)
+  },
+
+  publicarNoticia(id: string): Promise<Noticia | null> {
+    const noticia = estado.noticias.find((n) => n.id === id)
+    if (noticia) {
+      noticia.status = 'PUBLICADO'
+      noticia.publicadaEm = new Date().toISOString()
+    }
+    return responderMudanca(noticia ?? null)
+  },
+
   noticia: (id: string): Promise<Noticia | null> =>
     responder(estado.noticias.find((n) => n.id === id) ?? null),
   campanhas: (slug: string): Promise<Campanha[]> =>
@@ -1257,10 +1500,10 @@ export const lojaDosModulos = {
     const torneios = estadoDaDemonstracao.torneiosDe(slug)
     const social = projetos.filter((p) => p.tipo === 'SOCIAL' && p.status === 'CONCLUIDO')
     const contribuiu = estado.experiencias.some((e) => e.atletica.slug === slug)
-      || GUIAS.some((g) => g.autorAtletica?.slug === slug)
+      || estado.guias.some((g) => g.autorAtletica?.slug === slug)
     const transicao = estado.transicao.atleticaSlug === slug
       && estado.transicao.itens.every((i) => i.concluido)
-    const mentora = MENTORIAS.some((m) => m.atletica.slug === slug)
+    const mentora = estado.mentorias.some((m) => m.atletica.slug === slug)
 
     const alcancada: Record<string, boolean> = {
       'cq-01': eventos.total > 0,
@@ -1300,7 +1543,7 @@ export const lojaDosModulos = {
     const patrocinios = daAtletica(estado.patrocinios, slug)
       .filter((p) => p.etapa === 'ATIVO').length
     const contribuicoes = estado.experiencias.filter((e) => e.atletica.slug === slug).length
-      + GUIAS.filter((g) => g.autorAtletica?.slug === slug).length
+      + estado.guias.filter((g) => g.autorAtletica?.slug === slug).length
 
     const valores: Record<string, number> = {
       'Membros ativos': membros,

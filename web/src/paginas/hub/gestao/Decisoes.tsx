@@ -5,7 +5,7 @@ import type { Decisao, StatusDaDecisao } from '../../../api/tipos-gestao'
 import { Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Progresso, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 export const STATUS_DA_DECISAO: Record<StatusDaDecisao, { rotulo: string; classe: string }> = {
@@ -111,7 +111,7 @@ export function Decisoes() {
                         <div style={{ minWidth: 0 }}>
                           <strong>{d.titulo}</strong>
                           <div className="fraco">
-                            {d.opcoes.length} opções
+                            {plural(d.opcoes.length, 'opção', 'opções')}
                             {d.reuniaoTitulo ? ` · ${d.reuniaoTitulo}` : ''}
                           </div>
                         </div>

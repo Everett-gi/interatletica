@@ -5,7 +5,7 @@ import type { Comunidade, TipoDeComunidade } from '../../../api/tipos-conhecimen
 import { Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 import { corDerivada } from '../../../ui/tema'
 
 const TIPO: Record<TipoDeComunidade, { rotulo: string; icone: NomeDoIcone }> = {
@@ -137,7 +137,7 @@ export function Comunidades() {
 
                         <div className="linha entre" style={{ marginBottom: '0.9rem' }}>
                           <span className="fraco">
-                            {c.membros} pessoas · {c.atleticas} atléticas
+                            {plural(c.membros, 'pessoa')} · {plural(c.atleticas, 'atlética')}
                           </span>
                           <span className="fraco">
                             ativa {quando(c.ultimaAtividade)}

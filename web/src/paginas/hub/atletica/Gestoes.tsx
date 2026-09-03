@@ -10,7 +10,7 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro } from '../../../formatos'
+import { dinheiro, plural } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 /**
@@ -80,7 +80,7 @@ export function Gestoes() {
                             <div style={{ minWidth: 0 }}>
                               <strong>Gestão {g.ano}</strong>
                               <div className="fraco">
-                                {g.presidente} · {g.eventosRealizados} eventos ·{' '}
+                                {g.presidente} · {plural(g.eventosRealizados, 'evento')} ·{' '}
                                 {g.projetosConcluidos} projetos
                                 {g.saldoFinal !== null
                                   ? ` · fechou com ${dinheiro(g.saldoFinal)}`

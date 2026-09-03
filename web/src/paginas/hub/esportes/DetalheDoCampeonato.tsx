@@ -14,7 +14,7 @@ import {
 } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Progresso, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora } from '../../../formatos'
+import { dataEHora, plural } from '../../../formatos'
 import { atleticaPorSlug } from '../../../demo/dados'
 import { useSessao } from '../../../sessao/SessaoContexto'
 import { QuadroDeChaveamento, ClassificacaoDoTorneio } from '../Chaveamento'
@@ -79,7 +79,8 @@ export function DetalheDoCampeonato() {
             <>
               <CabecalhoDePagina
                 titulo={torneio.nome}
-                descricao={`${torneio.modalidade} · ${torneio.participantes.length} equipes · ${total} partidas`}
+                descricao={`${torneio.modalidade} · ${plural(torneio.participantes.length, 'equipe')}`
+                  + ` · ${plural(total, 'partida')}`}
                 trilha={[
                   { rotulo: 'Campeonatos', para: `/hub/${slug}/campeonatos` },
                   { rotulo: torneio.nome },

@@ -5,7 +5,7 @@ import type { PrestacaoDeContas as Prestacao } from '../../../api/tipos-financei
 import { Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Gaveta, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro, quando } from '../../../formatos'
+import { dinheiro, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 /**
@@ -145,8 +145,7 @@ export function PrestacaoDeContas() {
                           {p.aprovadaEm ? `aprovada ${quando(p.aprovadaEm)}` : 'em revisão'}
                         </span>
                         <span className="fraco">
-                          {p.documentos.length}{' '}
-                          {p.documentos.length === 1 ? 'anexo' : 'anexos'}
+                          {plural(p.documentos.length, 'anexo')}
                         </span>
                       </div>
                     </button>
@@ -331,8 +330,7 @@ function FechamentoDeMes({ slug, aoFechar, aoCancelar }: {
         <select value={alvo ?? ''} onChange={(e) => setEscolhida(e.target.value)}>
           {meses.map((m) => (
             <option key={m.competencia} value={m.competencia}>
-              {m.rotulo} — {m.lancamentos}{' '}
-              {m.lancamentos === 1 ? 'lançamento' : 'lançamentos'}
+              {m.rotulo} — {plural(m.lancamentos, 'lançamento')}
             </option>
           ))}
         </select>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type {
@@ -15,8 +15,9 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro, quando } from '../../../formatos'
+import { dinheiro, plural, quando } from '../../../formatos'
 import { corDerivada } from '../../../ui/tema'
+import { useSessao } from '../../../sessao/SessaoContexto'
 
 const CATEGORIA: Record<CategoriaDePatrimonio, string> = {
   ESPORTIVO: 'Esportivo',
@@ -49,23 +50,42 @@ type Filtro = 'TODOS' | CategoriaDePatrimonio
  */
 export function Patrimonio() {
   const { slug = '' } = useParams()
+  const { podeAtuarComo } = useSessao()
+  const diretor = podeAtuarComo(slug, 'DIRETOR')
   const [filtro, setFiltro] = useState<Filtro>('TODOS')
   const [aberto, setAberto] = useState<ItemDePatrimonio | null>(null)
+  const [cadastrando, setCadastrando] = useState(false)
 
   const itens = useBusca<ItemDePatrimonio[]>(() => Dados.patrimonio(slug), [slug])
+
+  /** Troca um item na lista e, se for o aberto, também na gaveta. */
+  const substituir = (item: ItemDePatrimonio) => {
+    itens.definir((itens.dados ?? []).map((x) => (x.id === item.id ? item : x)))
+    setAberto((atual) => (atual && atual.id === item.id ? item : atual))
+  }
 
   return (
     <div>
       <CabecalhoDePagina
         titulo="Patrimônio"
         descricao="O que a atlética tem, onde está e com quem. É o inventário que a próxima gestão recebe."
-        acoes={
-          <button className="botao" disabled
-                  title="Cadastro de item chega com a API conectada">
+        acoes={diretor ? (
+          <button className="botao" onClick={() => setCadastrando((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Novo item
           </button>
-        }
+        ) : undefined}
       />
+
+      {cadastrando ? (
+        <FormularioDeItem
+          slug={slug}
+          aoCadastrar={(item) => {
+            itens.definir([item, ...(itens.dados ?? [])])
+            setCadastrando(false)
+          }}
+          aoCancelar={() => setCadastrando(false)}
+        />
+      ) : null}
 
       <Conteudo busca={itens} esqueleto={<Esqueleto altura="16rem" />}>
         {(lista) => {
@@ -76,6 +96,11 @@ export function Patrimonio() {
                   Registre bolas, uniformes e equipamentos. Sem inventário, o que
                   se perde na troca de gestão não é o item — é saber que ele existia.
                 </p>
+                {diretor && !cadastrando ? (
+                  <button className="botao" onClick={() => setCadastrando(true)}>
+                    <Icone nome="mais" tamanho={16} /> Registrar o primeiro item
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -97,7 +122,7 @@ export function Patrimonio() {
             <>
               <div className="grade grade--metricas" style={{ marginBottom: '1.5rem' }}>
                 <Metrica rotulo="Itens no total" icone="patrimonio" valor={total}
-                         detalhe={`${lista.length} registros`} />
+                         detalhe={plural(lista.length, 'registro')} />
                 <Metrica rotulo="Valor estimado" icone="financeiro"
                          valor={dinheiro(valor)} />
                 <Metrica rotulo="Categorias" icone="grade"
@@ -207,6 +232,28 @@ export function Patrimonio() {
                       {aberto.observacao}
                     </div>
                   ) : null}
+
+                  {/* O estado é o campo que envelhece: a bola nova de março
+                      está desgastada em outubro, e é a conferência anual que
+                      alimenta isso. Trocar aqui evita ter que abrir um
+                      formulário de edição inteiro para mudar uma palavra. */}
+                  {diretor ? (
+                    <label className="campo" style={{ marginTop: '1rem' }}>
+                      <span className="campo__rotulo">Mudar o estado</span>
+                      <select
+                        value={aberto.estado}
+                        onChange={(e) => {
+                          void Dados.mudarEstadoDoItem(
+                            aberto.id, e.target.value as EstadoDoItem,
+                          ).then((item) => { if (item) substituir(item) })
+                        }}
+                      >
+                        {(Object.keys(ESTADO) as EstadoDoItem[]).map((x) => (
+                          <option key={x} value={x}>{ESTADO[x].rotulo}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                 </Gaveta>
               ) : null}
             </>
@@ -224,5 +271,131 @@ function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
       <span className="fraco">{rotulo}</span>
       <span style={{ fontWeight: 550, textAlign: 'right' }}>{valor}</span>
     </div>
+  )
+}
+
+/**
+ * Cadastrar um item.
+ *
+ * <p>Só nome e categoria são obrigatórios. Inventário que exige nota fiscal
+ * e foto para aceitar uma bola é inventário que fica vazio — e o que se
+ * perde na troca de gestão não é o item, é saber que ele existia.</p>
+ */
+function FormularioDeItem({ slug, aoCadastrar, aoCancelar }: {
+  slug: string
+  aoCadastrar: (item: ItemDePatrimonio) => void
+  aoCancelar: () => void
+}) {
+  const [nome, setNome] = useState('')
+  const [categoria, setCategoria] = useState<CategoriaDePatrimonio>('ESPORTIVO')
+  const [quantidade, setQuantidade] = useState('1')
+  const [estadoDoItem, setEstadoDoItem] = useState<EstadoDoItem>('NOVO')
+  const [local, setLocal] = useState('')
+  const [responsavel, setResponsavel] = useState('')
+  const [valor, setValor] = useState('')
+  const [observacao, setObservacao] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const item = await Dados.cadastrarPatrimonio(slug, {
+      nome: nome.trim(),
+      categoria,
+      quantidade: Number(quantidade) || 1,
+      estado: estadoDoItem,
+      localizacao: local.trim() === '' ? null : local.trim(),
+      responsavelNome: responsavel.trim() === '' ? null : responsavel.trim(),
+      valorEstimado: valor === '' ? null : Number(valor),
+      observacao: observacao.trim() === '' ? null : observacao.trim(),
+    })
+    setSalvando(false)
+    aoCadastrar(item)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Novo item</h3>
+      <p className="fraco">
+        Registre agora, mesmo sem valor nem foto. O que falta se completa
+        depois; o que não foi registrado some na troca de gestão.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que é</span>
+        <input value={nome} onChange={(e) => setNome(e.target.value)}
+               required maxLength={120} autoFocus
+               placeholder="Bola de futsal Penalty" />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Categoria</span>
+          <select value={categoria}
+                  onChange={(e) => setCategoria(e.target.value as CategoriaDePatrimonio)}>
+            {(Object.keys(CATEGORIA) as CategoriaDePatrimonio[]).map((c) => (
+              <option key={c} value={c}>{CATEGORIA[c]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Estado</span>
+          <select value={estadoDoItem}
+                  onChange={(e) => setEstadoDoItem(e.target.value as EstadoDoItem)}>
+            {(Object.keys(ESTADO) as EstadoDoItem[]).map((x) => (
+              <option key={x} value={x}>{ESTADO[x].rotulo}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Quantidade</span>
+          <input type="number" min={1} value={quantidade} required
+                 onChange={(e) => setQuantidade(e.target.value)} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Valor estimado (opcional)</span>
+          <input type="number" min={0} value={valor}
+                 onChange={(e) => setValor(e.target.value)} placeholder="180" />
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Onde fica</span>
+          <input value={local} onChange={(e) => setLocal(e.target.value)}
+                 maxLength={120} placeholder="Armário da sala da atlética" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Com quem</span>
+          <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)}
+                 maxLength={120} placeholder="Nome de quem guarda" />
+          <span className="campo__dica">
+            É a pergunta que a próxima gestão mais faz.
+          </span>
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Observação (opcional)</span>
+        <input value={observacao} onChange={(e) => setObservacao(e.target.value)}
+               maxLength={200} placeholder="Comprada com a verba da Calourada" />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit" disabled={salvando || !nome.trim()}>
+          {salvando ? 'Cadastrando…' : 'Cadastrar item'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

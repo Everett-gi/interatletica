@@ -10,7 +10,7 @@ import type {
 import { Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Chips, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro } from '../../../formatos'
+import { dinheiro, plural } from '../../../formatos'
 import { CATEGORIA } from './Financeiro'
 
 const SITUACAO: Record<SituacaoDoLancamento, { rotulo: string; classe: string }> = {
@@ -119,7 +119,7 @@ export function Lancamentos({ natureza }: { natureza: NaturezaDoLancamento }) {
                 <Metrica
                   rotulo="Em atraso" icone="alerta" valor={dinheiro(somar(atrasados))}
                   cor={atrasados.length > 0 ? 'var(--perigo)' : undefined}
-                  detalhe={`${atrasados.length} lançamentos`}
+                  detalhe={plural(atrasados.length, 'lançamento')}
                 />
                 <Metrica rotulo="Lançamentos" icone="lista" valor={daNatureza.length} />
               </div>
