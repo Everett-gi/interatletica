@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Projeto } from '../../../api/tipos-gestao'
 import type { Tarefa } from '../../../api/tipos-rede'
+import { useSessao } from '../../../sessao/SessaoContexto'
 import type { Lancamento } from '../../../api/tipos-financeiro'
 import { Abas, Avatar, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import {
@@ -37,7 +38,10 @@ interface Composicao {
  */
 export function DetalheDoProjeto() {
   const { slug = '', id = '' } = useParams()
+  const { podeAtuarComo } = useSessao()
+  const diretor = podeAtuarComo(slug, 'DIRETOR')
   const [aba, setAba] = useState<Aba>('VISAO')
+  const [encerrando, setEncerrando] = useState(false)
 
   const busca = useBusca<Composicao>(async () => {
     const [projeto, tarefas, lancamentos] = await Promise.all([
@@ -47,6 +51,12 @@ export function DetalheDoProjeto() {
     ])
     return { projeto, tarefas, lancamentos }
   }, [slug, id])
+
+  /** Troca só o projeto no resultado, sem refazer as três chamadas. */
+  const trocarProjeto = (projeto: Projeto) => {
+    const atual = busca.dados
+    if (atual) busca.definir({ ...atual, projeto })
+  }
 
   return (
     <div>
@@ -66,6 +76,11 @@ export function DetalheDoProjeto() {
           // Ligação por evento: a tarefa do interatlética é a tarefa do
           // projeto do interatlética. É o §106 — os módulos se conversam em
           // vez de repetirem o mesmo dado com nomes diferentes.
+          // Com roteiro, a unidade de trabalho do projeto e o passo; sem
+          // roteiro, e a tarefa do quadro ligada pelo evento.
+          const unidade = projeto.passos.length > 0
+            ? { nome: 'passos', feitos: 'concluídos' }
+            : { nome: 'tarefas', feitos: 'concluídas' }
           const doProjeto = tarefas.filter(
             (t) => projeto.eventoId !== null && t.eventoId === projeto.eventoId)
           const gastos = lancamentos.filter((l) => l.projetoId === projeto.id)
@@ -85,18 +100,39 @@ export function DetalheDoProjeto() {
                     {STATUS_DO_PROJETO[projeto.status].rotulo}
                   </span>
                 }
-                acoes={projeto.eventoId ? (
-                  <Link to={`/hub/${slug}/eventos/${projeto.eventoId}`}
-                        className="botao botao--discreto">
-                    <Icone nome="eventos" tamanho={16} /> Abrir o evento
-                  </Link>
-                ) : undefined}
+                acoes={
+                  <>
+                    {projeto.eventoId ? (
+                      <Link to={`/hub/${slug}/eventos/${projeto.eventoId}`}
+                            className="botao botao--discreto">
+                        <Icone nome="eventos" tamanho={16} /> Abrir o evento
+                      </Link>
+                    ) : null}
+                    {diretor && projeto.status !== 'CONCLUIDO' ? (
+                      <button className="botao" onClick={() => setEncerrando(true)}>
+                        <Icone nome="certo" tamanho={16} /> Encerrar
+                      </button>
+                    ) : null}
+                  </>
+                }
               />
+
+              {encerrando ? (
+                <FormularioDeEncerramento
+                  projeto={projeto}
+                  aoEncerrar={(p) => {
+                    trocarProjeto(p)
+                    setEncerrando(false)
+                    setAba('RESULTADOS')
+                  }}
+                  aoCancelar={() => setEncerrando(false)}
+                />
+              ) : null}
 
               <div className="grade grade--metricas" style={{ marginBottom: '1.4rem' }}>
                 <Metrica rotulo="Progresso" icone="projetos"
                          valor={percentual(projeto.progresso)}
-                         detalhe={`${projeto.tarefasConcluidas} de ${projeto.tarefasTotal} tarefas`} />
+                         detalhe={`${projeto.tarefasConcluidas} de ${projeto.tarefasTotal} ${unidade.nome}`} />
                 <Metrica rotulo="Tipo" icone="grade"
                          valor={TIPO_DE_PROJETO[projeto.tipo]} detalhe={projeto.area} />
                 <Metrica
@@ -122,9 +158,14 @@ export function DetalheDoProjeto() {
                 opcoes={[
                   { valor: 'VISAO', rotulo: 'Visão geral' },
                   { valor: 'CRONOGRAMA', rotulo: 'Cronograma', contagem: projeto.marcos.length },
-                  { valor: 'TAREFAS', rotulo: 'Tarefas', contagem: doProjeto.length },
+                  {
+                    valor: 'TAREFAS',
+                    rotulo: projeto.passos.length > 0 ? 'Roteiro' : 'Tarefas',
+                    contagem: projeto.passos.length > 0
+                      ? projeto.passos.length : doProjeto.length,
+                  },
                   { valor: 'ORCAMENTO', rotulo: 'Orçamento', contagem: gastos.length },
-                  ...(social || projeto.resultado
+                  ...(social || projeto.resultado || projeto.status === 'CONCLUIDO'
                     ? [{ valor: 'RESULTADOS' as Aba, rotulo: 'Resultados' }]
                     : []),
                 ]}
@@ -137,8 +178,8 @@ export function DetalheDoProjeto() {
                       <div className="cartao">
                         <div className="linha entre" style={{ marginBottom: '0.5rem' }}>
                           <span className="fraco">
-                            {projeto.tarefasConcluidas} de {projeto.tarefasTotal} tarefas
-                            concluídas
+                            {projeto.tarefasConcluidas} de {projeto.tarefasTotal}{' '}
+                            {unidade.nome} {unidade.feitos}
                           </span>
                           <strong>{percentual(projeto.progresso)}</strong>
                         </div>
@@ -153,16 +194,29 @@ export function DetalheDoProjeto() {
                           {projeto.marcos.map((m) => (
                             <ItemDaLinha key={m.id}
                                          estado={m.concluido ? 'feito' : 'pendente'}>
-                              <div style={{
-                                fontWeight: 550,
-                                textDecoration: m.concluido ? 'line-through' : undefined,
-                                color: m.concluido ? 'var(--texto-fraco)' : undefined,
-                              }}>
-                                {m.titulo}
-                              </div>
-                              {m.prazo ? (
-                                <div className="fraco">{quando(m.prazo)}</div>
-                              ) : null}
+                              {/* Marcar é clicar no próprio marco: um botão
+                                  "concluir" ao lado de cada linha encheria a
+                                  coluna de controles repetidos. */}
+                              <button
+                                className="linha-marcavel"
+                                disabled={!diretor}
+                                aria-pressed={m.concluido}
+                                onClick={() => {
+                                  void Dados.alternarMarcoDoProjeto(projeto.id, m.id)
+                                    .then((p) => { if (p) trocarProjeto(p) })
+                                }}
+                              >
+                                <span style={{
+                                  fontWeight: 550,
+                                  textDecoration: m.concluido ? 'line-through' : undefined,
+                                  color: m.concluido ? 'var(--texto-fraco)' : undefined,
+                                }}>
+                                  {m.titulo}
+                                </span>
+                                {m.prazo ? (
+                                  <span className="fraco">{quando(m.prazo)}</span>
+                                ) : null}
+                              </button>
                             </ItemDaLinha>
                           ))}
                         </LinhaDoTempo>
@@ -244,7 +298,44 @@ export function DetalheDoProjeto() {
               ) : null}
 
               {aba === 'TAREFAS' ? (
+                <>
+                  {projeto.passos.length > 0 ? (
+                    <Secao
+                      titulo="O roteiro do modelo"
+                      descricao="As etapas que outra atlética já descobriu que importam. Marque conforme resolver — o progresso do projeto sai daqui."
+                    >
+                      <div className="cartao">
+                        <div className="pilha pilha--densa">
+                          {projeto.passos.map((p) => (
+                            <button
+                              key={p.id}
+                              className="linha-marcavel"
+                              disabled={!diretor}
+                              aria-pressed={p.concluido}
+                              onClick={() => {
+                                void Dados.alternarPassoDoProjeto(projeto.id, p.id)
+                                  .then((x) => { if (x) trocarProjeto(x) })
+                              }}
+                            >
+                              <Icone nome={p.concluido ? 'certo' : 'lista'} tamanho={16} />
+                              <span style={{
+                                textDecoration: p.concluido ? 'line-through' : undefined,
+                                color: p.concluido ? 'var(--texto-fraco)' : undefined,
+                              }}>
+                                {p.titulo}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </Secao>
+                  ) : null}
+
                 <Secao
+                  titulo={projeto.passos.length > 0 ? 'Tarefas do quadro' : undefined}
+                  descricao={projeto.passos.length > 0
+                    ? 'O roteiro acima é uma lista de conferência. Trabalho com responsável e prazo vira tarefa no quadro.'
+                    : undefined}
                   acao={
                     <Link to={`/hub/${slug}/tarefas`}
                           className="botao botao--discreto botao--pequeno">
@@ -287,6 +378,7 @@ export function DetalheDoProjeto() {
                     </div>
                   )}
                 </Secao>
+                </>
               ) : null}
 
               {aba === 'ORCAMENTO' ? (
@@ -367,6 +459,12 @@ export function DetalheDoProjeto() {
                             funcionou. É o que transforma este projeto em
                             aprendizado da atlética, e não só de quem o tocou.
                           </p>
+                          {diretor && projeto.status !== 'CONCLUIDO' ? (
+                            <button className="botao"
+                                    onClick={() => setEncerrando(true)}>
+                              <Icone nome="certo" tamanho={16} /> Encerrar o projeto
+                            </button>
+                          ) : null}
                         </EstadoVazio>
                       )}
                     </Secao>
@@ -397,5 +495,72 @@ export function DetalheDoProjeto() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * Encerrar exige escrever o resultado.
+ *
+ * <p>Um botão que só muda o status para "concluído" perde o único momento em
+ * que alguém ainda lembra por que as coisas deram certo ou errado. Duas
+ * semanas depois, ninguém escreve — e a gestão seguinte recomeça do zero,
+ * que é exatamente o problema que a plataforma existe para resolver.</p>
+ */
+function FormularioDeEncerramento({ projeto, aoEncerrar, aoCancelar }: {
+  projeto: Projeto
+  aoEncerrar: (projeto: Projeto) => void
+  aoCancelar: () => void
+}) {
+  const [resultado, setResultado] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const pendentes = projeto.passos.filter((p) => !p.concluido).length
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const atualizado = await Dados.encerrarProjeto(projeto.id, resultado)
+    setSalvando(false)
+    if (atualizado) aoEncerrar(atualizado)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Encerrar “{projeto.nome}”</h3>
+      <p className="fraco">
+        Escreva agora, enquanto você lembra. Este texto é o que a próxima
+        diretoria vai ler antes de repetir o projeto.
+      </p>
+
+      {pendentes > 0 ? (
+        <div className="aviso aviso--alerta" style={{ marginBottom: '0.9rem' }}>
+          {pendentes === 1
+            ? 'Ainda há um passo do roteiro não marcado.'
+            : `Ainda há ${pendentes} passos do roteiro não marcados.`}
+          {' '}Encerrar assim mesmo é comum — nem todo roteiro se aplica inteiro.
+        </div>
+      ) : null}
+
+      <label className="campo">
+        <span className="campo__rotulo">O que este projeto produziu</span>
+        <textarea value={resultado} onChange={(e) => setResultado(e.target.value)}
+                  required rows={5}
+                  placeholder="Quanto rendeu, quantas pessoas, o que deu errado e o que faríamos diferente." />
+        <span className="campo__dica">
+          Número ajuda: "R$ 4.200 de saldo e 320 pessoas" diz mais que "correu bem".
+        </span>
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !resultado.trim()}>
+          {salvando ? 'Encerrando…' : 'Encerrar projeto'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

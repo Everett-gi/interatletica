@@ -1979,6 +1979,28 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .ligacao:hover { text-decoration: underline; }
 
+/* Uma linha inteira que se marca ao clicar: passo de roteiro, marco de
+   projeto. Botao de largura cheia em vez de caixa de selecao minuscula —
+   o alvo de toque e a linha, nao um quadradinho de 14px. */
+.linha-marcavel {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  margin: -0.3rem -0.4rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.linha-marcavel:hover:not(:disabled) { background: var(--fundo-afundado); }
+.linha-marcavel:disabled { cursor: default; }
+.linha-marcavel > span:last-child:not(:first-child) { margin-left: auto; }
+
 /* ------------------------------------------------------------------ */
 /* Tour de primeiro acesso                                            */
 /* ------------------------------------------------------------------ */

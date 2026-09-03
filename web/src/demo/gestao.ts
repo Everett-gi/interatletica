@@ -49,6 +49,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: 17400,
     eventoId: 'e-01',
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-01', titulo: 'Fechar as seis atléticas participantes', prazo: dias(-60), concluido: true },
       { id: 'mc-02', titulo: 'Contratar ginásio e arbitragem', prazo: dias(-20), concluido: true },
@@ -79,6 +80,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: 9800,
     eventoId: 'e-02',
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-06', titulo: 'Reservar o galpão', prazo: dias(-30), concluido: true },
       { id: 'mc-07', titulo: 'Contratar segurança', prazo: dias(-6), concluido: true },
@@ -109,6 +111,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: 940,
     eventoId: null,
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-09', titulo: 'Fechar parceria com os abrigos', prazo: dias(-130), concluido: true },
       { id: 'mc-10', titulo: 'Montar pontos de coleta', prazo: dias(-110), concluido: true },
@@ -140,6 +143,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: 0,
     eventoId: null,
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-12', titulo: 'Aprovar direção criativa em assembleia', prazo: dias(20), concluido: false },
       { id: 'mc-13', titulo: 'Fechar fornecedor de uniforme', prazo: dias(40), concluido: false },
@@ -167,6 +171,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: null,
     eventoId: null,
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-14', titulo: 'Montar o material de contrapartidas', prazo: dias(-10), concluido: true },
       { id: 'mc-15', titulo: 'Fechar dois patrocínios anuais', prazo: dias(85), concluido: false },
@@ -194,6 +199,7 @@ export const PROJETOS: Projeto[] = [
     orcamentoGasto: 2600,
     eventoId: 'e-03',
     gestaoAno: 2026,
+    passos: [],
     marcos: [
       { id: 'mc-16', titulo: 'Primeira etapa realizada', prazo: dias(6), concluido: false },
     ],

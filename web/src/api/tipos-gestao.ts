@@ -41,6 +41,21 @@ export interface MarcoDoProjeto {
   concluido: boolean
 }
 
+/**
+ * Um passo do roteiro herdado de um modelo.
+ *
+ * <p>Mora no projeto, e nao na tabela de tarefas, porque e isso que ele e:
+ * o roteiro que veio junto com o modelo. Tarefa do quadro tem responsavel,
+ * prazo e coluna; passo de roteiro tem um estado so — feito ou nao — e
+ * existe para nao deixar cair nenhuma das etapas que a outra atletica ja
+ * descobriu que importam.</p>
+ */
+export interface PassoDoProjeto {
+  id: string
+  titulo: string
+  concluido: boolean
+}
+
 export interface Projeto {
   id: string
   atleticaSlug: string
@@ -63,6 +78,11 @@ export interface Projeto {
   eventoId: string | null
   gestaoAno: number
   marcos: MarcoDoProjeto[]
+  /**
+   * O roteiro herdado do modelo. Vazio nos projetos montados a mao —
+   * nesse caso `tarefasTotal` e `tarefasConcluidas` valem pelo que sao.
+   */
+  passos: PassoDoProjeto[]
   /** Só em projetos sociais. Vazio nos demais. */
   parceiros: string[]
   beneficiados: number | null

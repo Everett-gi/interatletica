@@ -190,6 +190,14 @@ function novoId(prefixo: string): string {
 const daAtletica = <T extends { atleticaSlug: string }>(lista: T[], slug: string) =>
   lista.filter((item) => item.atleticaSlug === slug)
 
+/** Contadores e progresso do projeto saem do roteiro, quando há roteiro. */
+function recontarProjeto(projeto: Projeto): void {
+  if (projeto.passos.length === 0) return
+  projeto.tarefasTotal = projeto.passos.length
+  projeto.tarefasConcluidas = projeto.passos.filter((p) => p.concluido).length
+  projeto.progresso = projeto.tarefasConcluidas / projeto.passos.length
+}
+
 /** "2026-09" vira "Setembro de 2026" — inclusive para meses fora da semente. */
 function rotuloDaCompetencia(competencia: string): string {
   const [ano, mes] = competencia.split('-').map(Number)
@@ -631,6 +639,9 @@ export const lojaDosModulos = {
       progresso: 0,
       tarefasTotal: modelo?.tarefas.length ?? 0,
       tarefasConcluidas: 0,
+      passos: (modelo?.tarefas ?? []).map((titulo, i) => ({
+        id: novoId(`ps${i}`), titulo, concluido: false,
+      })),
       orcamentoPrevisto: null,
       orcamentoGasto: null,
       eventoId: null,
@@ -644,6 +655,42 @@ export const lojaDosModulos = {
     }
     estado.projetos.unshift(projeto)
     return responderMudanca(projeto)
+  },
+
+  /**
+   * Marcar um passo do roteiro.
+   *
+   * <p>O progresso do projeto sai daqui, e não de digitação: um percentual
+   * que alguém escreve à mão é um percentual que ninguém confere. Projeto
+   * montado à mão, sem roteiro, mantém os contadores que já tinha — não há
+   * de onde derivar.</p>
+   */
+  alternarPassoDoProjeto(projetoId: string, passoId: string): Promise<Projeto | null> {
+    const projeto = estado.projetos.find((p) => p.id === projetoId)
+    const passo = projeto?.passos.find((x) => x.id === passoId)
+    if (projeto && passo) {
+      passo.concluido = !passo.concluido
+      recontarProjeto(projeto)
+    }
+    return responderMudanca(projeto ?? null, 80)
+  },
+
+  /** O marco é a entrega visível; o passo é o trabalho para chegar nela. */
+  alternarMarcoDoProjeto(projetoId: string, marcoId: string): Promise<Projeto | null> {
+    const projeto = estado.projetos.find((p) => p.id === projetoId)
+    const marco = projeto?.marcos.find((m) => m.id === marcoId)
+    if (marco) marco.concluido = !marco.concluido
+    return responderMudanca(projeto ?? null, 80)
+  },
+
+  /** Encerrar o projeto exige escrever o resultado — é o que vira aprendizado. */
+  encerrarProjeto(projetoId: string, resultado: string): Promise<Projeto | null> {
+    const projeto = estado.projetos.find((p) => p.id === projetoId)
+    if (projeto) {
+      projeto.status = 'CONCLUIDO'
+      projeto.resultado = resultado.trim() || null
+    }
+    return responderMudanca(projeto ?? null)
   },
 
   metas: (slug: string): Promise<Meta[]> => responder(daAtletica(estado.metas, slug)),

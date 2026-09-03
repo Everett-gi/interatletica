@@ -12,13 +12,13 @@ import { TIPO_DE_PROJETO } from './Projetos'
  * Começar um projeto a partir de um modelo (§20).
  *
  * <p>Este é o núcleo estratégico do produto numa tela só. O modelo de
- * calourada dos Leões carrega treze tarefas — e as três últimas existem
+ * calourada dos Leões carrega treze passos — e os três últimos existem
  * porque a edição de 2024 deles teve problema com a vizinhança. Quem usa o
  * modelo herda o erro que outra atlética já pagou, sem precisar cometê-lo.</p>
  *
- * <p>A confirmação antes de criar as tarefas não é burocracia: criar 25
- * tarefas de uma vez sem avisar assusta, e a pessoa apaga tudo achando que
- * o sistema fez besteira.</p>
+ * <p>A confirmação antes de trazer o roteiro não é burocracia: um projeto
+ * que aparece com 25 linhas sem aviso assusta, e a pessoa apaga tudo achando
+ * que o sistema fez besteira.</p>
  */
 export function NovoProjeto() {
   const { slug = '' } = useParams()
@@ -110,7 +110,7 @@ export function NovoProjeto() {
                       <div className="linha" style={{ gap: '0.35rem',
                                                       marginBottom: '0.7rem' }}>
                         <span className="etiqueta etiqueta--acento">
-                          {modelo.tarefas.length} tarefas
+                          {modelo.tarefas.length} passos
                         </span>
                         <span className="etiqueta">{modelo.marcos.length} marcos</span>
                         <span className="etiqueta">{modelo.duracaoEmDias} dias</span>
@@ -134,7 +134,7 @@ export function NovoProjeto() {
               <Secao titulo={`O que o modelo “${escolhido.nome}” cria`}>
                 <div className="detalhe">
                   <div className="cartao">
-                    <h3>Tarefas</h3>
+                    <h3>Roteiro</h3>
                     <ol className="lista-marcada" style={{ paddingLeft: '1.3rem' }}>
                       {escolhido.tarefas.map((t) => <li key={t}>{t}</li>)}
                     </ol>
@@ -164,7 +164,7 @@ export function NovoProjeto() {
                 <div>
                   <strong>Projeto vazio</strong>
                   <div className="fraco">
-                    Sem tarefas nem marcos. Você monta o roteiro do zero.
+                    Sem roteiro nem marcos. Você monta as etapas do zero.
                   </div>
                 </div>
                 <button
@@ -185,14 +185,15 @@ export function NovoProjeto() {
       {confirmando ? (
         <Confirmacao
           titulo={escolhido
-            ? `Criar ${escolhido.tarefas.length} tarefas automaticamente?`
+            ? `Trazer o roteiro de ${escolhido.tarefas.length} passos?`
             : 'Criar projeto em branco?'}
           consequencia={escolhido
-            ? `O projeto “${nome.trim() || escolhido.nome}” nasce com `
-              + `${escolhido.tarefas.length} tarefas e ${escolhido.marcos.length} marcos `
-              + 'já criados. Você pode apagar o que não usar.'
-            : 'O projeto será criado sem tarefas nem marcos.'}
-          rotuloDeConfirmar={escolhido ? 'Criar com as tarefas' : 'Criar'}
+            ? `O projeto “${nome.trim() || escolhido.nome}” nasce com o roteiro `
+              + `de ${escolhido.tarefas.length} passos e ${escolhido.marcos.length} marcos, `
+              + 'para marcar conforme resolver. O progresso do projeto sai daí. '
+              + 'O que precisar de responsável e prazo você promove a tarefa no quadro.'
+            : 'O projeto será criado sem roteiro nem marcos.'}
+          rotuloDeConfirmar={escolhido ? 'Criar com o roteiro' : 'Criar'}
           perigo={false}
           aoConfirmar={() => { setConfirmando(false); void criar() }}
           aoCancelar={() => setConfirmando(false)}
