@@ -10,7 +10,7 @@ import {
   Vazio,
 } from '../../ui/componentes'
 import { Previa } from '../../ui/componentes'
-import { dataEHora } from '../../formatos'
+import { dataEHora, plural } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
 /**
@@ -44,7 +44,7 @@ export function Chaveamento() {
         </Link>
         <h1 style={{ marginTop: '0.3rem' }}>{torneio.nome}</h1>
         <div className="fraco">
-          {torneio.modalidade} · {torneio.participantes.length} participantes
+          {torneio.modalidade} · {plural(torneio.participantes.length, 'participante')}
         </div>
       </header>
 

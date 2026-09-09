@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Amistoso, NivelDoAmistoso } from '../../../api/tipos-mercado'
+import type { AtleticaResumo } from '../../../api/tipos'
 import { Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, Confirmacao, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dataEHora, quando } from '../../../formatos'
+import { dataEHora, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
 
 const NIVEL: Record<NivelDoAmistoso, { rotulo: string; classe: string }> = {
@@ -30,6 +31,7 @@ export function Amistosos() {
   const [nivel, setNivel] = useState('TODOS')
   const [uf, setUf] = useState('TODOS')
   const [confirmando, setConfirmando] = useState<Amistoso | null>(null)
+  const [publicando, setPublicando] = useState(false)
 
   const amistosos = useBusca<Amistoso[]>(() => Dados.amistosos(), [])
 
@@ -47,13 +49,23 @@ export function Amistosos() {
       <CabecalhoDePagina
         titulo="Amistosos"
         descricao="Quem está procurando adversário, em que modalidade, quando e onde."
-        acoes={
-          <button className="botao" disabled
-                  title="Publicar amistoso chega com a API conectada">
+        acoes={minha ? (
+          <button className="botao" onClick={() => setPublicando((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Procurar adversário
           </button>
-        }
+        ) : undefined}
       />
+
+      {publicando && minha ? (
+        <FormularioDeAmistoso
+          minha={minha}
+          aoPublicar={(a) => {
+            amistosos.definir([a, ...(amistosos.dados ?? [])])
+            setPublicando(false)
+          }}
+          aoCancelar={() => setPublicando(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={amistosos}
@@ -71,6 +83,11 @@ export function Amistosos() {
                   Publique o primeiro: diga modalidade, data, cidade e nível. É a
                   forma mais rápida de a sua equipe pegar ritmo antes do campeonato.
                 </p>
+                {minha && !publicando ? (
+                  <button className="botao" onClick={() => setPublicando(true)}>
+                    <Icone nome="mais" tamanho={16} /> Publicar o primeiro
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -210,7 +227,7 @@ export function Amistosos() {
                                   ))}
                                 </div>
                                 <span className="fraco">
-                                  {a.interessadas.length} interessadas
+                                  {plural(a.interessadas.length, 'interessada')}
                                 </span>
                               </div>
                               <button className="botao botao--largo"
@@ -250,4 +267,126 @@ export function Amistosos() {
       </Conteudo>
     </div>
   )
+}
+
+/**
+ * Publicar a procura por adversário.
+ *
+ * <p>Cidade, data e nível são os três campos que fazem o anúncio dar em
+ * alguma coisa. Sem eles o post vira "alguém quer jogar?", que é o que já
+ * não funciona no grupo de mensagens.</p>
+ */
+function FormularioDeAmistoso({ minha, aoPublicar, aoCancelar }: {
+  minha: AtleticaResumo
+  aoPublicar: (amistoso: Amistoso) => void
+  aoCancelar: () => void
+}) {
+  const [modalidade, setModalidade] = useState('')
+  const [categoria, setCategoria] = useState('Livre')
+  const [data, setData] = useState(emDuasSemanas())
+  const [cidade, setCidade] = useState(minha.cidade ?? '')
+  const [uf, setUf] = useState(minha.uf ?? '')
+  const [nivel, setNivel] = useState<NivelDoAmistoso>('INTERMEDIARIO')
+  const [observacao, setObservacao] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const amistoso = await Dados.publicarAmistoso(minha, {
+      modalidade: modalidade.trim(),
+      categoria: categoria.trim() || 'Livre',
+      data: new Date(data).toISOString(),
+      cidade: cidade.trim(),
+      uf: uf.trim().toUpperCase(),
+      nivel,
+      observacao: observacao.trim() === '' ? null : observacao.trim(),
+    })
+    setSalvando(false)
+    aoPublicar(amistoso)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Procurar adversário</h3>
+      <p className="fraco">
+        Declare o nível de verdade. Amistoso que termina 8 a 0 não se repete,
+        e é o segundo jogo que faz a equipe pegar ritmo.
+      </p>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Modalidade</span>
+          <input value={modalidade} onChange={(e) => setModalidade(e.target.value)}
+                 required maxLength={60} autoFocus placeholder="Vôlei feminino" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Categoria</span>
+          <input value={categoria} onChange={(e) => setCategoria(e.target.value)}
+                 maxLength={40} placeholder="Livre" />
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Quando</span>
+          <input type="datetime-local" value={data} required
+                 onChange={(e) => setData(e.target.value)} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Nível</span>
+          <select value={nivel}
+                  onChange={(e) => setNivel(e.target.value as NivelDoAmistoso)}>
+            {(Object.keys(NIVEL) as NivelDoAmistoso[]).map((n) => (
+              <option key={n} value={n}>{NIVEL[n].rotulo}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grade" style={{ gridTemplateColumns: '2fr 1fr' }}>
+        <label className="campo">
+          <span className="campo__rotulo">Cidade</span>
+          <input value={cidade} onChange={(e) => setCidade(e.target.value)}
+                 required maxLength={80} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">UF</span>
+          <input value={uf} onChange={(e) => setUf(e.target.value.toUpperCase())}
+                 required maxLength={2} />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Observação (opcional)</span>
+        <input value={observacao} onChange={(e) => setObservacao(e.target.value)}
+               maxLength={200}
+               placeholder="Temos quadra e arbitragem; a visitante leva o transporte." />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !modalidade.trim() || !cidade.trim() || !uf.trim()}>
+          {salvando ? 'Publicando…' : 'Publicar para a rede'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** Padrão do campo de data: daqui a duas semanas, às 19h, em horário local. */
+function emDuasSemanas(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 14)
+  d.setHours(19, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    + `T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { CompraColetiva, EtapaDaCompra } from '../../../api/tipos-mercado'
@@ -13,8 +13,10 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { dinheiro, percentual, quando } from '../../../formatos'
+import { dinheiro, percentual, plural, quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
+import type { AtleticaResumo } from '../../../api/tipos'
+import type { Fornecedor } from '../../../api/tipos-mercado'
 
 const ETAPA: Record<EtapaDaCompra, { rotulo: string; classe: string }> = {
   ABERTA: { rotulo: 'Aberta', classe: 'etiqueta--sucesso' },
@@ -47,6 +49,7 @@ export function ComprasColetivas() {
   const minha = vinculo(slug)?.atletica
   const [confirmando, setConfirmando] = useState<CompraColetiva | null>(null)
   const [quantidade, setQuantidade] = useState('50')
+  const [abrindo, setAbrindo] = useState(false)
 
   const compras = useBusca<CompraColetiva[]>(() => Dados.comprasColetivas(), [])
 
@@ -65,13 +68,24 @@ export function ComprasColetivas() {
       <CabecalhoDePagina
         titulo="Compras coletivas"
         descricao="Juntar o pedido de várias atléticas para chegar na faixa de desconto por volume."
-        acoes={
-          <button className="botao botao--discreto" disabled
-                  title="Abrir compra chega com a API conectada">
+        acoes={minha ? (
+          <button className="botao botao--discreto"
+                  onClick={() => setAbrindo((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Abrir compra
           </button>
-        }
+        ) : undefined}
       />
+
+      {abrindo && minha ? (
+        <FormularioDeCompra
+          minha={minha}
+          aoAbrir={(c) => {
+            compras.definir([c, ...(compras.dados ?? [])])
+            setAbrindo(false)
+          }}
+          aoCancelar={() => setAbrindo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={compras}
@@ -89,6 +103,11 @@ export function ComprasColetivas() {
                   Abra a primeira: uniformes, medalhas e kits de primeiros socorros
                   são os itens em que o volume mais derruba o preço.
                 </p>
+                {minha && !abrindo ? (
+                  <button className="botao" onClick={() => setAbrindo(true)}>
+                    <Icone nome="mais" tamanho={16} /> Abrir a primeira
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -141,7 +160,7 @@ export function ComprasColetivas() {
                           <strong>{c.titulo}</strong>
                           <div className="fraco">
                             {c.quantidadeAtual} unidades ·{' '}
-                            {c.interessados.length} atléticas
+                            {plural(c.interessados.length, 'atlética')}
                             {c.fornecedorNome ? ` · ${c.fornecedorNome}` : ''}
                           </div>
                         </div>
@@ -285,7 +304,7 @@ function CartaoDeCompra({ compra, slug, aoParticipar }: {
             <Brasao key={i.atletica.slug} atletica={i.atletica} tamanho="p" />
           ))}
         </div>
-        <span className="fraco">{compra.interessados.length} atléticas</span>
+        <span className="fraco">{plural(compra.interessados.length, 'atlética')}</span>
       </div>
 
       {compra.fornecedorId ? (
@@ -310,4 +329,130 @@ function CartaoDeCompra({ compra, slug, aoParticipar }: {
       )}
     </div>
   )
+}
+
+/**
+ * Abrir uma compra coletiva.
+ *
+ * <p>A quantidade mínima é o coração da coisa: é o número a partir do qual o
+ * fornecedor melhora o preço, e é ele que diz a quem chega se vale entrar.
+ * Compra sem mínimo declarado é lista de interessados, não compra.</p>
+ */
+function FormularioDeCompra({ minha, aoAbrir, aoCancelar }: {
+  minha: AtleticaResumo
+  aoAbrir: (compra: CompraColetiva) => void
+  aoCancelar: () => void
+}) {
+  const fornecedores = useBusca<Fornecedor[]>(() => Dados.fornecedores(), [])
+  const [titulo, setTitulo] = useState('')
+  const [produto, setProduto] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [minimo, setMinimo] = useState('200')
+  const [prazo, setPrazo] = useState(emUmMes())
+  const [preco, setPreco] = useState('')
+  const [fornecedorId, setFornecedorId] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const compra = await Dados.abrirCompraColetiva(minha, {
+      titulo: titulo.trim(),
+      produto: produto.trim(),
+      descricao: descricao.trim(),
+      quantidadeMinima: Number(minimo) || 1,
+      prazo: new Date(`${prazo}T23:59:00`).toISOString(),
+      precoEstimado: preco === '' ? null : Number(preco),
+      fornecedorId: fornecedorId === '' ? null : fornecedorId,
+    })
+    setSalvando(false)
+    aoAbrir(compra)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Abrir compra coletiva</h3>
+      <p className="fraco">
+        Sua atlética organiza e as outras entram com a quantidade delas. A
+        negociação com o fornecedor acontece fora daqui — a plataforma junta o
+        grupo, não processa pagamento.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">Título</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Camisa de torcida para a temporada 2027" />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">O que é</span>
+          <input value={produto} onChange={(e) => setProduto(e.target.value)}
+                 required maxLength={120} placeholder="Camisa dry-fit personalizada" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Fornecedor (opcional)</span>
+          <select value={fornecedorId}
+                  onChange={(e) => setFornecedorId(e.target.value)}>
+            <option value="">Ainda não escolhido</option>
+            {(fornecedores.dados ?? []).map((f) => (
+              <option key={f.id} value={f.id}>{f.nome}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Detalhes</span>
+        <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                  required rows={3}
+                  placeholder="Modelo, cores, grade de tamanhos e como a arte de cada atlética entra." />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Quantidade mínima</span>
+          <input type="number" min={1} value={minimo} required
+                 onChange={(e) => setMinimo(e.target.value)} />
+          <span className="campo__dica">
+            A partir de quanto o preço melhora. É o que decide se alguém entra.
+          </span>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Prazo para entrar</span>
+          <input type="date" value={prazo} required
+                 onChange={(e) => setPrazo(e.target.value)} />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Preço estimado por unidade (opcional)</span>
+        <input type="number" min={0} value={preco}
+               onChange={(e) => setPreco(e.target.value)} placeholder="42" />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !produto.trim()
+                  || !descricao.trim()}>
+          {salvando ? 'Abrindo…' : 'Abrir para a rede'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** Padrão do prazo: um mês, que é o tempo que costuma levar para juntar gente. */
+function emUmMes(): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() + 1)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }

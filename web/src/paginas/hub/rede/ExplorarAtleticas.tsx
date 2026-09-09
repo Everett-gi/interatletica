@@ -181,7 +181,7 @@ export function ExplorarAtleticas() {
                           </span>
                           {item.organizadoras > 1 ? (
                             <span className="etiqueta etiqueta--acento">
-                              {item.organizadoras} atléticas
+                              {plural(item.organizadoras, 'atlética')}
                             </span>
                           ) : null}
                         </div>

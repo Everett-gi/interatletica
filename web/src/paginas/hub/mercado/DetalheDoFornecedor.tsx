@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type {
@@ -14,8 +15,10 @@ import {
   Secao,
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 import { CATEGORIA_DE_FORNECEDOR, FAIXA } from './Fornecedores'
+import { useSessao } from '../../../sessao/SessaoContexto'
+import type { AtleticaResumo } from '../../../api/tipos'
 
 const CRITERIO: { chave: keyof NotasDoFornecedor; rotulo: string }[] = [
   { chave: 'qualidade', rotulo: 'Qualidade' },
@@ -40,6 +43,9 @@ interface Composicao {
  */
 export function DetalheDoFornecedor() {
   const { slug = '', id = '' } = useParams()
+  const { perfil, vinculo } = useSessao()
+  const minha = vinculo(slug)?.atletica
+  const [avaliando, setAvaliando] = useState(false)
 
   const busca = useBusca<Composicao>(async () => {
     const [fornecedor, avaliacoes] = await Promise.all([
@@ -79,13 +85,30 @@ export function DetalheDoFornecedor() {
                 etiqueta={
                   <span className="etiqueta">{CATEGORIA_DE_FORNECEDOR[f.categoria]}</span>
                 }
-                acoes={
-                  <button className="botao" disabled
-                          title="Avaliar chega com a API conectada">
+                acoes={minha ? (
+                  <button className="botao" onClick={() => setAvaliando((v) => !v)}>
                     <Icone nome="estrela" tamanho={16} /> Avaliar
                   </button>
-                }
+                ) : undefined}
               />
+
+              {avaliando && minha ? (
+                <FormularioDeAvaliacao
+                  fornecedorId={f.id}
+                  minha={minha}
+                  autorSugerido={perfil?.nome ?? ''}
+                  aoAvaliar={(nova) => {
+                    void Dados.fornecedor(f.id).then((atualizado) => {
+                      busca.definir({
+                        fornecedor: atualizado,
+                        avaliacoes: [nova, ...avaliacoes],
+                      })
+                    })
+                    setAvaliando(false)
+                  }}
+                  aoCancelar={() => setAvaliando(false)}
+                />
+              ) : null}
 
               <div className="detalhe">
                 <div>
@@ -95,7 +118,7 @@ export function DetalheDoFornecedor() {
                         <div>
                           <div className="numero-grande">{f.nota.toFixed(1)}</div>
                           <Estrelas nota={f.nota} tamanho={17} />
-                          <div className="fraco">{f.avaliacoes} avaliações</div>
+                          <div className="fraco">{plural(f.avaliacoes, 'avaliação', 'avaliações')}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className="pilha pilha--densa">
@@ -262,5 +285,115 @@ export function DetalheDoFornecedor() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+const NOTAS_PADRAO: NotasDoFornecedor = {
+  qualidade: 4, preco: 4, prazo: 4, atendimento: 4, confiabilidade: 4,
+}
+
+/**
+ * Avaliar em cinco critérios, e não numa estrela só.
+ *
+ * <p>"Nota 3" não diz se o problema foi o preço ou o prazo, e são decisões
+ * diferentes: com o primeiro você negocia, com o segundo você muda de
+ * fornecedor. O contexto — o que foi comprado — é o que separa uma nota
+ * útil de uma opinião.</p>
+ */
+function FormularioDeAvaliacao({ fornecedorId, minha, autorSugerido, aoAvaliar, aoCancelar }: {
+  fornecedorId: string
+  minha: AtleticaResumo
+  autorSugerido: string
+  aoAvaliar: (avaliacao: AvaliacaoDeFornecedor) => void
+  aoCancelar: () => void
+}) {
+  const [notas, setNotas] = useState<NotasDoFornecedor>(NOTAS_PADRAO)
+  const [comentario, setComentario] = useState('')
+  const [contexto, setContexto] = useState('')
+  const [autor, setAutor] = useState(autorSugerido)
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const avaliacao = await Dados.avaliarFornecedor(fornecedorId, minha, {
+      autorNome: autor.trim(),
+      notas,
+      comentario: comentario.trim(),
+      contexto: contexto.trim() === '' ? null : contexto.trim(),
+    })
+    setSalvando(false)
+    aoAvaliar(avaliacao)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Avaliar este fornecedor</h3>
+      <p className="fraco">
+        Escreva o que você gostaria de ter lido antes de contratar. Prazo real,
+        o que deu errado e como resolveram valem mais que o elogio.
+      </p>
+
+      <div className="pilha pilha--densa" style={{ marginBottom: '1rem' }}>
+        {CRITERIO.map(({ chave, rotulo }) => (
+          <div key={chave} className="linha entre">
+            <span style={{ fontSize: '0.9rem' }}>{rotulo}</span>
+            <div className="linha" style={{ gap: '0.2rem' }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="estrela-botao"
+                  aria-label={`${rotulo}: ${n} de 5`}
+                  aria-pressed={n <= notas[chave]}
+                  onClick={() => setNotas((atual) => ({ ...atual, [chave]: n }))}
+                >
+                  <svg width={20} height={20} viewBox="0 0 24 24"
+                       fill={n <= notas[chave] ? 'currentColor' : 'none'}
+                       stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round"
+                       aria-hidden="true" focusable="false">
+                    <path d="m12 3.8 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.9l5.8-.8Z" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que vocês compraram</span>
+        <input value={contexto} onChange={(e) => setContexto(e.target.value)}
+               maxLength={140} placeholder="16 conjuntos de vôlei feminino" />
+        <span className="campo__dica">
+          Nota sem contexto não ajuda: lote de 16 e lote de 200 são atendimentos
+          diferentes.
+        </span>
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Como foi</span>
+        <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
+                  required rows={4}
+                  placeholder="Prazo prometido e prazo real, o que deu errado, como resolveram." />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Assinatura</span>
+        <input value={autor} onChange={(e) => setAutor(e.target.value)}
+               required maxLength={120} />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !comentario.trim() || !autor.trim()}>
+          {salvando ? 'Publicando…' : 'Publicar avaliação'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

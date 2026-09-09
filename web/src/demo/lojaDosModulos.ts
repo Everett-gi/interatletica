@@ -51,6 +51,7 @@ import type {
   AvaliacaoDeFornecedor,
   CompraColetiva,
   Fornecedor,
+  NotasDoFornecedor,
   Oportunidade,
   Parceria,
   Produto,
@@ -149,8 +150,13 @@ interface Estado {
   lancamentos: Lancamento[]
   prestacoes: PrestacaoDeContas[]
   patrocinios: Patrocinio[]
+  jogos: Jogo[]
+  viagens: Viagem[]
   pedidos: PedidoDeAjuda[]
+  fornecedores: Fornecedor[]
+  avaliacoes: Record<string, AvaliacaoDeFornecedor[]>
   comunidades: Comunidade[]
+  postsDeComunidade: PostDaComunidade[]
   compras: CompraColetiva[]
   parcerias: Parceria[]
   amistosos: Amistoso[]
@@ -175,8 +181,13 @@ const estado: Estado = {
   lancamentos: clonar(LANCAMENTOS),
   prestacoes: clonar(PRESTACOES),
   patrocinios: clonar(PATROCINIOS),
+  jogos: clonar(JOGOS),
+  viagens: clonar(VIAGENS),
   pedidos: clonar(PEDIDOS_DE_AJUDA),
+  fornecedores: clonar(FORNECEDORES),
+  avaliacoes: clonar(AVALIACOES),
   comunidades: clonar(COMUNIDADES),
+  postsDeComunidade: clonar(POSTS_DE_COMUNIDADE),
   compras: clonar(COMPRAS_COLETIVAS),
   parcerias: clonar(PARCERIAS),
   amistosos: clonar(AMISTOSOS),
@@ -212,6 +223,34 @@ function rotuloDaCompetencia(competencia: string): string {
   const nome = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
     .format(new Date(ano, mes - 1, 15))
   return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`
+}
+
+/**
+ * A nota do fornecedor sai sempre das avaliações.
+ *
+ * <p>Guardar a média à parte é como as duas telas passam a discordar: a
+ * lista mostra 4,6 e a ficha soma 4,2. Aqui só existe uma fonte.</p>
+ */
+function recalcularFornecedor(id: string): void {
+  const fornecedor = estado.fornecedores.find((f) => f.id === id)
+  const lista = estado.avaliacoes[id] ?? []
+  if (!fornecedor || lista.length === 0) return
+
+  const media = (pegar: (n: NotasDoFornecedor) => number) =>
+    lista.reduce((s, a) => s + pegar(a.notas), 0) / lista.length
+
+  fornecedor.detalheDasNotas = {
+    qualidade: media((n) => n.qualidade),
+    preco: media((n) => n.preco),
+    prazo: media((n) => n.prazo),
+    atendimento: media((n) => n.atendimento),
+    confiabilidade: media((n) => n.confiabilidade),
+  }
+  const criterios = Object.values(fornecedor.detalheDasNotas)
+  fornecedor.nota = criterios.reduce((s, x) => s + x, 0) / criterios.length
+  fornecedor.avaliacoes = lista.length
+  fornecedor.atleticasAtendidas = new Set(lista.map((a) => a.atletica.slug)).size
+  fornecedor.ultimaCompra = lista[0].quando
 }
 
 function somarPorNatureza(lista: Lancamento[]): { receitas: number; despesas: number } {
@@ -322,12 +361,24 @@ export interface FatiaDosModulos {
   patrocinios: unknown[]
   noticias: unknown[]
   campanhas: unknown[]
+  jogos: unknown[]
+  viagens: unknown[]
   /** Experiências que a minha atlética publicou na rede. */
   minhasExperiencias: unknown[]
   /** Mentorias que a minha atlética ofereceu. */
   minhasMentorias: unknown[]
   /** A minha ficha no banco de talentos, quando existe. */
   meuTalento: unknown | null
+  /** Fornecedores que a minha atlética cadastrou, e as avaliações minhas. */
+  meusFornecedores: unknown[]
+  minhasAvaliacoes: Record<string, unknown[]>
+  /** Compras coletivas que a minha atlética organizou. */
+  minhasCompras: unknown[]
+  /** Amistosos e parcerias que a minha atlética publicou. */
+  meusAmistosos: unknown[]
+  minhasParcerias: unknown[]
+  /** Posts meus em comunidades da rede: `{ comunidadeId: post[] }`. */
+  postsEmComunidades: Record<string, unknown[]>
   guiasSalvos: string[]
   guiasUteis: string[]
   mentoriasQueSolicitei: string[]
@@ -370,10 +421,31 @@ export function exportarFatiaDosModulos(meus: Set<string>): FatiaDosModulos {
     patrocinios: daMinha(estado.patrocinios),
     noticias: daMinha(estado.noticias),
     campanhas: daMinha(estado.campanhas),
+    jogos: daMinha(estado.jogos),
+    viagens: daMinha(estado.viagens),
     minhasExperiencias: estado.experiencias.filter((e) => meus.has(e.atletica.slug)),
     minhasMentorias: estado.mentorias.filter((m) => meus.has(m.atletica.slug)),
     meuTalento: estado.talentos.find(
       (t) => t.atletica !== null && meus.has(t.atletica.slug)) ?? null,
+    meusFornecedores: estado.fornecedores.filter(
+      (f) => f.indicadoPor !== null && meus.has(f.indicadoPor.slug)),
+    minhasAvaliacoes: Object.fromEntries(
+      Object.entries(estado.avaliacoes)
+        .map(([id, lista]) => [id, lista.filter((a) => meus.has(a.atletica.slug))])
+        .filter(([, lista]) => (lista as unknown[]).length > 0)),
+    minhasCompras: estado.compras.filter((c) => meus.has(c.organizadora.slug)),
+    meusAmistosos: estado.amistosos.filter((a) => meus.has(a.atletica.slug)),
+    minhasParcerias: estado.parcerias.filter(
+      (p) => p.proponente !== null && meus.has(p.proponente.slug)),
+    postsEmComunidades: Object.fromEntries(
+      estado.comunidades
+        .map((c) => [
+          c.id,
+          estado.postsDeComunidade.filter(
+            (p) => p.comunidadeId === c.id
+              && p.atletica !== null && meus.has(p.atletica.slug)),
+        ])
+        .filter(([, posts]) => (posts as unknown[]).length > 0)),
     guiasSalvos: estado.guias.filter((g) => g.salvo).map((g) => g.id),
     guiasUteis: estado.guias.filter((g) => g.marqueiUtil).map((g) => g.id),
     mentoriasQueSolicitei: estado.mentorias.filter((m) => m.solicitei).map((m) => m.id),
@@ -428,9 +500,25 @@ export function importarFatiaDosModulos(
   estado.patrocinios.push(...(fatia.patrocinios ?? []) as Patrocinio[])
   estado.noticias.push(...(fatia.noticias ?? []) as Noticia[])
   estado.campanhas.push(...(fatia.campanhas ?? []) as Campanha[])
+  estado.jogos.push(...(fatia.jogos ?? []) as Jogo[])
+  estado.viagens.push(...(fatia.viagens ?? []) as Viagem[])
   estado.experiencias.unshift(...(fatia.minhasExperiencias ?? []) as Experiencia[])
   estado.mentorias.unshift(...(fatia.minhasMentorias ?? []) as OfertaDeMentoria[])
   if (fatia.meuTalento) estado.talentos.unshift(fatia.meuTalento as Talento)
+  estado.fornecedores.unshift(...(fatia.meusFornecedores ?? []) as Fornecedor[])
+  Object.entries(fatia.minhasAvaliacoes ?? {}).forEach(([id, lista]) => {
+    estado.avaliacoes[id] = [
+      ...lista as AvaliacaoDeFornecedor[],
+      ...(estado.avaliacoes[id] ?? []),
+    ]
+    recalcularFornecedor(id)
+  })
+  estado.compras.unshift(...(fatia.minhasCompras ?? []) as CompraColetiva[])
+  estado.amistosos.unshift(...(fatia.meusAmistosos ?? []) as Amistoso[])
+  estado.parcerias.unshift(...(fatia.minhasParcerias ?? []) as Parceria[])
+  Object.values(fatia.postsEmComunidades ?? {}).forEach((posts) => {
+    estado.postsDeComunidade.unshift(...posts as PostDaComunidade[])
+  })
   estado.pedidos.unshift(...(fatia.meusPedidos ?? []) as PedidoDeAjuda[])
 
   Object.entries(fatia.respostasEmOutros ?? {}).forEach(([pedidoId, respostas]) => {
@@ -1100,6 +1188,45 @@ export const lojaDosModulos = {
   patrocinio: (id: string): Promise<Patrocinio | null> =>
     responder(estado.patrocinios.find((p) => p.id === id) ?? null),
 
+  /**
+   * Abrir um patrocínio no funil (§27).
+   *
+   * <p>Entra em prospecção, e não em "ativo": o funil só serve se registrar
+   * também o que não fechou. Uma lista onde só aparece patrocínio assinado
+   * não responde a pergunta que a próxima diretoria faz — "com quem já
+   * falamos e o que eles disseram?".</p>
+   */
+  abrirPatrocinio(slug: string, dados: {
+    empresa: string
+    segmento: string
+    contatoNome: string | null
+    contatoEmail: string | null
+    valor: number | null
+    contrapartidas: string[]
+    responsavelNome: string | null
+    observacao: string | null
+  }): Promise<Patrocinio> {
+    const patrocinio: Patrocinio = {
+      id: novoId('ps'),
+      atleticaSlug: slug,
+      empresa: dados.empresa,
+      segmento: dados.segmento,
+      contatoNome: dados.contatoNome,
+      contatoEmail: dados.contatoEmail,
+      etapa: 'PROSPECCAO',
+      valor: dados.valor,
+      contrapartidas: dados.contrapartidas,
+      inicioEm: null,
+      fimEm: null,
+      responsavelNome: dados.responsavelNome,
+      logoUrl: null,
+      observacao: dados.observacao,
+      atualizadoEm: new Date().toISOString(),
+    }
+    estado.patrocinios.unshift(patrocinio)
+    return responderMudanca(patrocinio)
+  },
+
   moverPatrocinio(id: string, etapa: Patrocinio['etapa']): Promise<Patrocinio | null> {
     const patrocinio = estado.patrocinios.find((p) => p.id === id)
     if (patrocinio) {
@@ -1111,9 +1238,118 @@ export const lojaDosModulos = {
 
   // ---------------- Esportes ----------------
   atletas: (slug: string): Promise<Atleta[]> => responder(daAtletica(ATLETAS, slug)),
-  jogos: (slug: string): Promise<Jogo[]> => responder(daAtletica(JOGOS, slug)),
+  jogos: (slug: string): Promise<Jogo[]> => responder(daAtletica(estado.jogos, slug)),
+
+  /**
+   * Marcar um jogo (§32).
+   *
+   * <p>Nasce pendente, sem placar: o jogo existe na agenda antes de existir
+   * no resultado, e é essa a razão de a tela ter as duas metades. Registrar
+   * só depois de jogado é como o calendário da equipe deixa de servir para
+   * combinar transporte.</p>
+   */
+  marcarJogo(slug: string, dados: {
+    modalidade: string
+    equipeNome: string
+    adversario: string
+    adversarioAtleticaSlug: string | null
+    inicioEm: string
+    local: string | null
+    competicao: string | null
+  }): Promise<Jogo> {
+    const jogo: Jogo = {
+      id: novoId('jg'),
+      atleticaSlug: slug,
+      modalidade: dados.modalidade,
+      equipeNome: dados.equipeNome,
+      adversario: dados.adversario,
+      adversarioAtleticaSlug: dados.adversarioAtleticaSlug,
+      inicioEm: dados.inicioEm,
+      local: dados.local,
+      competicao: dados.competicao,
+      torneioId: null,
+      placarNos: null,
+      placarDeles: null,
+      resultado: 'PENDENTE',
+      destaques: [],
+    }
+    estado.jogos.unshift(jogo)
+    return responderMudanca(jogo)
+  },
+
+  /** O resultado sai do placar, e não de escolha manual: não há como divergir. */
+  registrarSumula(
+    id: string, placarNos: number, placarDeles: number, destaques: string[],
+  ): Promise<Jogo | null> {
+    const jogo = estado.jogos.find((j) => j.id === id)
+    if (jogo) {
+      jogo.placarNos = placarNos
+      jogo.placarDeles = placarDeles
+      jogo.resultado = placarNos > placarDeles ? 'VITORIA'
+        : placarNos < placarDeles ? 'DERROTA' : 'EMPATE'
+      jogo.destaques = destaques
+    }
+    return responderMudanca(jogo ?? null)
+  },
   artilharia: (): Promise<LinhaDeArtilharia[]> => responder(ARTILHARIA),
-  viagens: (slug: string): Promise<Viagem[]> => responder(daAtletica(VIAGENS, slug)),
+  viagens: (slug: string): Promise<Viagem[]> => responder(daAtletica(estado.viagens, slug)),
+
+  /**
+   * Organizar uma viagem (§33).
+   *
+   * <p>Vagas e custo por pessoa entram no cadastro porque são as duas
+   * perguntas que chegam no minuto seguinte ao anúncio. Viagem publicada sem
+   * elas gera trinta mensagens no grupo perguntando a mesma coisa.</p>
+   */
+  criarViagem(slug: string, dados: {
+    destino: string
+    motivo: string
+    saidaEm: string
+    retornoEm: string
+    vagas: number
+    transporte: string | null
+    hospedagem: string | null
+    custoPorPessoa: number | null
+    responsavelNome: string | null
+  }): Promise<Viagem> {
+    const viagem: Viagem = {
+      id: novoId('vg'),
+      atleticaSlug: slug,
+      destino: dados.destino,
+      motivo: dados.motivo,
+      eventoId: null,
+      saidaEm: dados.saidaEm,
+      retornoEm: dados.retornoEm,
+      passageiros: 0,
+      vagas: dados.vagas,
+      transporte: dados.transporte,
+      hospedagem: dados.hospedagem,
+      custoPorPessoa: dados.custoPorPessoa,
+      responsavelNome: dados.responsavelNome,
+      pagos: 0,
+      documentosPendentes: 0,
+    }
+    estado.viagens.unshift(viagem)
+    return responderMudanca(viagem)
+  },
+
+  /**
+   * Ajustar quantos embarcaram e quantos pagaram.
+   *
+   * <p>Números à mão de propósito: a plataforma não recebe dinheiro, então
+   * quem confere o pagamento é a diretoria — e o campo existe para o
+   * controle não voltar para a planilha paralela.</p>
+   */
+  atualizarViagem(
+    id: string, passageiros: number, pagos: number,
+  ): Promise<Viagem | null> {
+    const viagem = estado.viagens.find((v) => v.id === id)
+    if (viagem) {
+      viagem.passageiros = Math.max(0, Math.min(passageiros, viagem.vagas))
+      viagem.pagos = Math.max(0, Math.min(pagos, viagem.passageiros))
+    }
+    return responderMudanca(viagem ?? null, 80)
+  },
   viagem: (id: string): Promise<Viagem | null> =>
     responder(VIAGENS.find((v) => v.id === id) ?? null),
 
@@ -1169,7 +1405,40 @@ export const lojaDosModulos = {
     responder(estado.comunidades.find((c) => c.id === id) ?? null),
 
   postsDaComunidade: (id: string): Promise<PostDaComunidade[]> =>
-    responder(POSTS_DE_COMUNIDADE.filter((p) => p.comunidadeId === id)),
+    responder(estado.postsDeComunidade.filter((p) => p.comunidadeId === id)),
+
+  /**
+   * Escrever na comunidade (§34).
+   *
+   * <p>Post assinado por pessoa e por atlética ao mesmo tempo: quem responde
+   * quer saber com quem está falando, e de que tamanho é a atlética que
+   * está perguntando — a resposta para uma de sessenta membros não serve
+   * para uma de seiscentos.</p>
+   */
+  publicarNaComunidade(comunidadeId: string, autor: {
+    nome: string
+    avatarUrl: string | null
+    atletica: AtleticaResumo | null
+  }, corpo: string): Promise<PostDaComunidade> {
+    const post: PostDaComunidade = {
+      id: novoId('pc'),
+      comunidadeId,
+      autorNome: autor.nome,
+      autorAvatarUrl: autor.avatarUrl,
+      atletica: autor.atletica,
+      corpo,
+      quando: new Date().toISOString(),
+      respostas: 0,
+      util: 0,
+    }
+    estado.postsDeComunidade.unshift(post)
+    // Publicar mexe o relogio da comunidade: uma lista ordenada por
+    // "ultima atividade" que ignora o post recem-escrito manda a pessoa
+    // procurar o proprio texto no meio da lista.
+    const comunidade = estado.comunidades.find((c) => c.id === comunidadeId)
+    if (comunidade) comunidade.ultimaAtividade = post.quando
+    return responderMudanca(post)
+  },
 
   alternarComunidade(id: string): Promise<Comunidade | null> {
     const comunidade = estado.comunidades.find((c) => c.id === id)
@@ -1182,6 +1451,49 @@ export const lojaDosModulos = {
 
   amistosos: (): Promise<Amistoso[]> => responder(estado.amistosos),
 
+  /**
+   * Publicar procura de adversário (§45).
+   *
+   * <p>Cidade e nível são obrigatórios porque são os dois filtros que fazem
+   * a busca funcionar: amistoso a quatrocentos quilômetros e amistoso contra
+   * time três níveis acima são as duas formas de o anúncio não dar em
+   * nada.</p>
+   */
+  publicarAmistoso(minha: AtleticaResumo, dados: {
+    modalidade: string
+    categoria: string
+    data: string
+    cidade: string
+    uf: string
+    nivel: Amistoso['nivel']
+    observacao: string | null
+  }): Promise<Amistoso> {
+    const amistoso: Amistoso = {
+      id: novoId('am'),
+      atletica: minha,
+      modalidade: dados.modalidade,
+      categoria: dados.categoria,
+      data: dados.data,
+      cidade: dados.cidade,
+      uf: dados.uf,
+      nivel: dados.nivel,
+      observacao: dados.observacao,
+      interessadas: [],
+      fechadoCom: null,
+      tenhoInteresse: false,
+    }
+    estado.amistosos.unshift(amistoso)
+    return responderMudanca(amistoso)
+  },
+
+  /** Fechar com uma das interessadas encerra a procura para as outras. */
+  fecharAmistoso(id: string, comSlug: string): Promise<Amistoso | null> {
+    const amistoso = estado.amistosos.find((a) => a.id === id)
+    const escolhida = amistoso?.interessadas.find((x) => x.slug === comSlug)
+    if (amistoso && escolhida) amistoso.fechadoCom = escolhida
+    return responderMudanca(amistoso ?? null)
+  },
+
   demonstrarInteresseEmAmistoso(id: string, minha: AtleticaResumo): Promise<Amistoso | null> {
     const amistoso = estado.amistosos.find((a) => a.id === id)
     if (amistoso && !amistoso.tenhoInteresse) {
@@ -1192,6 +1504,52 @@ export const lojaDosModulos = {
   },
 
   parcerias: (): Promise<Parceria[]> => responder(estado.parcerias),
+
+  /**
+   * Propor uma parceria à rede (§46).
+   *
+   * <p>Quem fecha desconto com a gráfica da esquina normalmente fecha para
+   * si. Trazer a proposta para a rede é o que transforma um desconto de uma
+   * atlética em poder de compra de vinte — e é por isso que o benefício é
+   * campo obrigatório: "parceria com a Ótica Vale" sem dizer o que a outra
+   * atlética ganha não é proposta, é aviso.</p>
+   */
+  proporParceria(minha: AtleticaResumo, dados: {
+    titulo: string
+    tipo: Parceria['tipo']
+    parceiroNome: string
+    descricao: string
+    beneficio: string
+    validade: string | null
+    cidade: string | null
+    uf: string | null
+  }): Promise<Parceria> {
+    const parceria: Parceria = {
+      id: novoId('pr'),
+      titulo: dados.titulo,
+      tipo: dados.tipo,
+      parceiroNome: dados.parceiroNome,
+      parceiroLogoUrl: null,
+      proponente: minha,
+      descricao: dados.descricao,
+      beneficio: dados.beneficio,
+      etapa: 'DISPONIVEL',
+      interessadas: [],
+      validade: dados.validade,
+      cidade: dados.cidade,
+      uf: dados.uf,
+      tenhoInteresse: false,
+    }
+    estado.parcerias.unshift(parceria)
+    return responderMudanca(parceria)
+  },
+
+  /** A etapa anda no sentido da negociação; quem propôs é quem move. */
+  moverParceria(id: string, etapa: Parceria['etapa']): Promise<Parceria | null> {
+    const parceria = estado.parcerias.find((p) => p.id === id)
+    if (parceria) parceria.etapa = etapa
+    return responderMudanca(parceria ?? null, 80)
+  },
 
   demonstrarInteresseEmParceria(id: string, minha: AtleticaResumo): Promise<Parceria | null> {
     const parceria = estado.parcerias.find((p) => p.id === id)
@@ -1366,13 +1724,127 @@ export const lojaDosModulos = {
   },
 
   // ---------------- Mercado ----------------
-  fornecedores: (): Promise<Fornecedor[]> => responder(FORNECEDORES),
+  fornecedores: (): Promise<Fornecedor[]> => responder(estado.fornecedores),
   fornecedor: (id: string): Promise<Fornecedor | null> =>
-    responder(FORNECEDORES.find((f) => f.id === id) ?? null),
+    responder(estado.fornecedores.find((f) => f.id === id) ?? null),
+
+  /**
+   * Cadastrar um fornecedor na rede (§48).
+   *
+   * <p>O cadastro é da rede, não da atlética: a gráfica que imprimiu bem
+   * para uma serve para as vizinhas. Nasce sem nota — a reputação vem das
+   * avaliações, e fornecedor que se cadastra com cinco estrelas próprias
+   * é catálogo de propaganda.</p>
+   */
+  cadastrarFornecedor(minha: AtleticaResumo, dados: {
+    nome: string
+    categoria: Fornecedor['categoria']
+    descricao: string
+    cidade: string | null
+    uf: string | null
+    contato: string | null
+    site: string | null
+    faixaDePreco: Fornecedor['faixaDePreco']
+    atendeRemoto: boolean
+  }): Promise<Fornecedor> {
+    const fornecedor: Fornecedor = {
+      id: novoId('fn'),
+      nome: dados.nome,
+      categoria: dados.categoria,
+      cidade: dados.cidade,
+      uf: dados.uf,
+      contato: dados.contato,
+      site: dados.site,
+      descricao: dados.descricao,
+      nota: 0,
+      avaliacoes: 0,
+      atleticasAtendidas: 0,
+      faixaDePreco: dados.faixaDePreco,
+      atendeRemoto: dados.atendeRemoto,
+      ultimaCompra: null,
+      detalheDasNotas: {
+        qualidade: 0, preco: 0, prazo: 0, atendimento: 0, confiabilidade: 0,
+      },
+      indicadoPor: minha,
+    }
+    estado.fornecedores.unshift(fornecedor)
+    return responderMudanca(fornecedor)
+  },
   avaliacoesDoFornecedor: (id: string): Promise<AvaliacaoDeFornecedor[]> =>
-    responder(AVALIACOES[id] ?? []),
+    responder(estado.avaliacoes[id] ?? []),
+
+  /**
+   * Avaliar um fornecedor.
+   *
+   * <p>Cinco critérios em vez de uma estrela só: "nota 3" não diz se o
+   * problema foi preço ou prazo, e são decisões diferentes. A média do
+   * fornecedor é recalculada a partir de todas as avaliações — não existe
+   * nota guardada à parte que possa divergir da lista.</p>
+   */
+  avaliarFornecedor(fornecedorId: string, minha: AtleticaResumo, dados: {
+    autorNome: string
+    notas: NotasDoFornecedor
+    comentario: string
+    contexto: string | null
+  }): Promise<AvaliacaoDeFornecedor> {
+    const avaliacao: AvaliacaoDeFornecedor = {
+      id: novoId('av'),
+      atletica: minha,
+      autorNome: dados.autorNome,
+      quando: new Date().toISOString(),
+      notas: dados.notas,
+      comentario: dados.comentario,
+      contexto: dados.contexto,
+    }
+    estado.avaliacoes[fornecedorId] = [
+      avaliacao,
+      ...(estado.avaliacoes[fornecedorId] ?? []),
+    ]
+    recalcularFornecedor(fornecedorId)
+    return responderMudanca(avaliacao)
+  },
 
   comprasColetivas: (): Promise<CompraColetiva[]> => responder(estado.compras),
+
+  /**
+   * Abrir uma compra coletiva (§50).
+   *
+   * <p>A quantidade mínima é o que dá sentido à compra: é o número a partir
+   * do qual o fornecedor melhora o preço, e é ele que diz se a compra vai
+   * fechar ou expirar. Sem mínimo declarado, ninguém sabe se vale entrar.</p>
+   */
+  abrirCompraColetiva(minha: AtleticaResumo, dados: {
+    titulo: string
+    produto: string
+    descricao: string
+    quantidadeMinima: number
+    prazo: string
+    precoEstimado: number | null
+    fornecedorId: string | null
+  }): Promise<CompraColetiva> {
+    const fornecedor = dados.fornecedorId
+      ? estado.fornecedores.find((f) => f.id === dados.fornecedorId) ?? null
+      : null
+    const compra: CompraColetiva = {
+      id: novoId('cc'),
+      titulo: dados.titulo,
+      produto: dados.produto,
+      descricao: dados.descricao,
+      organizadora: minha,
+      etapa: 'ABERTA',
+      quantidadeMinima: dados.quantidadeMinima,
+      quantidadeAtual: 0,
+      prazo: dados.prazo,
+      precoEstimado: dados.precoEstimado,
+      economiaPercentual: null,
+      fornecedorId: fornecedor?.id ?? null,
+      fornecedorNome: fornecedor?.nome ?? null,
+      interessados: [],
+      participo: false,
+    }
+    estado.compras.unshift(compra)
+    return responderMudanca(compra)
+  },
   compraColetiva: (id: string): Promise<CompraColetiva | null> =>
     responder(estado.compras.find((c) => c.id === id) ?? null),
 
@@ -1443,6 +1915,48 @@ export const lojaDosModulos = {
     responder(estado.noticias.find((n) => n.id === id) ?? null),
   campanhas: (slug: string): Promise<Campanha[]> =>
     responder(daAtletica(estado.campanhas, slug)),
+  /**
+   * Criar uma campanha (§59).
+   *
+   * <p>Meta com número e unidade, como as metas da gestão: "aumentar o
+   * engajamento" não fecha o mês com resposta. O conteúdo entra depois, na
+   * ficha da campanha — pedir o calendário inteiro no cadastro é o que faz
+   * a campanha nunca sair do papel.</p>
+   */
+  criarCampanha(slug: string, dados: {
+    nome: string
+    objetivo: string
+    metaValor: number
+    metaUnidade: string
+    inicioEm: string
+    fimEm: string
+    responsavelNome: string | null
+  }): Promise<Campanha> {
+    const campanha: Campanha = {
+      id: novoId('cp'),
+      atleticaSlug: slug,
+      nome: dados.nome,
+      objetivo: dados.objetivo,
+      metaValor: dados.metaValor,
+      metaUnidade: dados.metaUnidade,
+      atual: 0,
+      inicioEm: dados.inicioEm,
+      fimEm: dados.fimEm,
+      responsavelNome: dados.responsavelNome,
+      patrocinioId: null,
+      conteudos: [],
+    }
+    estado.campanhas.unshift(campanha)
+    return responderMudanca(campanha)
+  },
+
+  /** O número da campanha vem do relatório da rede social, digitado à mão. */
+  atualizarCampanha(id: string, atual: number): Promise<Campanha | null> {
+    const campanha = estado.campanhas.find((c) => c.id === id)
+    if (campanha) campanha.atual = Math.max(0, atual)
+    return responderMudanca(campanha ?? null, 80)
+  },
+
   campanha: (id: string): Promise<Campanha | null> =>
     responder(estado.campanhas.find((c) => c.id === id) ?? null),
   midias: (slug: string): Promise<Midia[]> => responder(daAtletica(MIDIAS, slug)),

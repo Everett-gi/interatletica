@@ -59,6 +59,13 @@ export interface Fornecedor {
   atendeRemoto: boolean
   ultimaCompra: string | null
   detalheDasNotas: NotasDoFornecedor
+  /**
+   * Quem trouxe este fornecedor para a rede.
+   *
+   * <p>Nulo nos que ja vinham no catalogo. Serve para responder "quem
+   * indicou?" — a pergunta que decide se vale ligar.</p>
+   */
+  indicadoPor: AtleticaResumo | null
 }
 
 // ---------------------------------------------------------------------

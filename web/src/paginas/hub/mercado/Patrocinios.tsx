@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { EtapaDoPatrocinio, Patrocinio } from '../../../api/tipos-financeiro'
@@ -12,6 +12,7 @@ import {
 } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
 import { dinheiro, quando } from '../../../formatos'
+import { useSessao } from '../../../sessao/SessaoContexto'
 
 const ETAPAS: { etapa: EtapaDoPatrocinio; rotulo: string }[] = [
   { etapa: 'PROSPECCAO', rotulo: 'Prospecção' },
@@ -39,6 +40,9 @@ export function Patrocinios() {
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [alvo, setAlvo] = useState<EtapaDoPatrocinio | null>(null)
   const [aberto, setAberto] = useState<Patrocinio | null>(null)
+  const [prospectando, setProspectando] = useState(false)
+  const { perfil, podeAtuarComo } = useSessao()
+  const diretor = podeAtuarComo(slug, 'DIRETOR')
 
   const patrocinios = useBusca<Patrocinio[]>(() => Dados.patrocinios(slug), [slug])
 
@@ -73,14 +77,28 @@ export function Patrocinios() {
                 { valor: 'LISTA', rotulo: 'Lista', icone: 'lista' },
               ]}
             />
-            <button className="botao" disabled title="Cadastro chega com a API conectada">
-              <Icone nome="mais" tamanho={16} /> Novo prospect
-            </button>
+            {diretor ? (
+              <button className="botao" onClick={() => setProspectando((v) => !v)}>
+                <Icone nome="mais" tamanho={16} /> Novo prospect
+              </button>
+            ) : null}
           </>
         }
       />
 
       <Previa oQueFalta="Cadastrar e mover patrocínio ainda não chegam ao servidor." />
+
+      {prospectando ? (
+        <FormularioDePatrocinio
+          slug={slug}
+          responsavelSugerido={perfil?.nome ?? ''}
+          aoAbrir={(p) => {
+            patrocinios.definir([p, ...(patrocinios.dados ?? [])])
+            setProspectando(false)
+          }}
+          aoCancelar={() => setProspectando(false)}
+        />
+      ) : null}
 
       <Conteudo busca={patrocinios} esqueleto={<Esqueleto altura="18rem" />}>
         {(lista) => {
@@ -304,5 +322,130 @@ function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
       <span className="fraco">{rotulo}</span>
       <span style={{ fontWeight: 550, textAlign: 'right' }}>{valor}</span>
     </div>
+  )
+}
+
+/**
+ * Abrir um prospect no funil.
+ *
+ * <p>As contrapartidas são o campo que separa patrocínio de doação: sem
+ * dizer o que a atlética entrega, a conversa com a empresa não tem como
+ * avançar — e a diretoria seguinte não sabe o que foi prometido.</p>
+ */
+function FormularioDePatrocinio({ slug, responsavelSugerido, aoAbrir, aoCancelar }: {
+  slug: string
+  responsavelSugerido: string
+  aoAbrir: (patrocinio: Patrocinio) => void
+  aoCancelar: () => void
+}) {
+  const [empresa, setEmpresa] = useState('')
+  const [segmento, setSegmento] = useState('')
+  const [contatoNome, setContatoNome] = useState('')
+  const [contatoEmail, setContatoEmail] = useState('')
+  const [valor, setValor] = useState('')
+  const [contrapartidas, setContrapartidas] = useState('')
+  const [responsavel, setResponsavel] = useState(responsavelSugerido)
+  const [observacao, setObservacao] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const patrocinio = await Dados.abrirPatrocinio(slug, {
+      empresa: empresa.trim(),
+      segmento: segmento.trim(),
+      contatoNome: contatoNome.trim() === '' ? null : contatoNome.trim(),
+      contatoEmail: contatoEmail.trim() === '' ? null : contatoEmail.trim(),
+      valor: valor === '' ? null : Number(valor),
+      contrapartidas: contrapartidas.split('\n')
+        .map((x) => x.trim()).filter((x) => x !== ''),
+      responsavelNome: responsavel.trim() === '' ? null : responsavel.trim(),
+      observacao: observacao.trim() === '' ? null : observacao.trim(),
+    })
+    setSalvando(false)
+    aoAbrir(patrocinio)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Novo prospect</h3>
+      <p className="fraco">
+        Entra em prospecção, mesmo que a conversa ainda nem tenha começado. O
+        funil só serve se registrar também o que não fechou — é o que responde
+        "com quem já falamos?" no ano que vem.
+      </p>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Empresa</span>
+          <input value={empresa} onChange={(e) => setEmpresa(e.target.value)}
+                 required maxLength={120} autoFocus placeholder="Ótica Vale" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Segmento</span>
+          <input value={segmento} onChange={(e) => setSegmento(e.target.value)}
+                 required maxLength={80} placeholder="Varejo óptico" />
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Quem é o contato</span>
+          <input value={contatoNome} onChange={(e) => setContatoNome(e.target.value)}
+                 maxLength={120} placeholder="Nome de quem decide" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">E-mail do contato</span>
+          <input type="email" value={contatoEmail}
+                 onChange={(e) => setContatoEmail(e.target.value)}
+                 maxLength={180} placeholder="contato@empresa.com.br" />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que vamos entregar</span>
+        <textarea value={contrapartidas}
+                  onChange={(e) => setContrapartidas(e.target.value)}
+                  rows={4}
+                  placeholder={'Uma linha por contrapartida:\nLogo na camisa de jogo\nPost no Instagram a cada rodada\nBanner no ginásio'} />
+        <span className="campo__dica">
+          Sem isto, patrocínio vira doação — e doação não se renova.
+        </span>
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Valor pretendido (opcional)</span>
+          <input type="number" min={0} value={valor}
+                 onChange={(e) => setValor(e.target.value)} placeholder="3000" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Quem cuida disto</span>
+          <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)}
+                 maxLength={120} />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Observação (opcional)</span>
+        <input value={observacao} onChange={(e) => setObservacao(e.target.value)}
+               maxLength={200}
+               placeholder="Indicação da Atlética Leões; renovam contrato em março." />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !empresa.trim() || !segmento.trim()}>
+          {salvando ? 'Abrindo…' : 'Abrir no funil'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

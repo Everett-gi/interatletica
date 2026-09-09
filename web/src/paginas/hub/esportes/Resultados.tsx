@@ -7,7 +7,7 @@ import type { LinhaDeRanking, TipoDeRanking } from '../../../api/tipos-plataform
 import { Abas, Brasao, Conteudo, Esqueleto, Metrica, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao, Variacao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { percentual } from '../../../formatos'
+import { percentual, plural } from '../../../formatos'
 
 type Aba = 'TEMPORADA' | 'QUADRO' | 'ARTILHARIA' | 'RANKINGS'
 
@@ -123,7 +123,8 @@ export function Resultados() {
                           <div key={modalidade} className="cartao">
                             <strong>{modalidade}</strong>
                             <div className="fraco" style={{ marginBottom: '0.5rem' }}>
-                              {daModalidade.length} jogos disputados
+                              {plural(daModalidade.length, 'jogo')}{' '}
+                              {daModalidade.length === 1 ? 'disputado' : 'disputados'}
                             </div>
                             <div className="numero-medio">
                               {daModalidade.length === 0

@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { Viagem } from '../../../api/tipos-esportes'
@@ -19,7 +20,9 @@ export function Viagens() {
   const { slug = '' } = useParams()
   const { podeAtuarComo } = useSessao()
   const diretor = podeAtuarComo(slug, 'DIRETOR')
+  const { perfil } = useSessao()
   const viagens = useBusca<Viagem[]>(() => Dados.viagens(slug), [slug])
+  const [criando, setCriando] = useState(false)
 
   return (
     <div>
@@ -27,13 +30,25 @@ export function Viagens() {
         titulo="Viagens"
         descricao="Transporte, hospedagem, pagamentos e documentos de cada deslocamento."
         acoes={diretor ? (
-          <button className="botao" disabled title="Cadastro chega com a API conectada">
+          <button className="botao" onClick={() => setCriando((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Nova viagem
           </button>
         ) : undefined}
       />
 
       <Previa oQueFalta="Criar viagem e controlar pagamento ainda não chegam ao servidor." />
+
+      {criando ? (
+        <FormularioDeViagem
+          slug={slug}
+          responsavelSugerido={perfil?.nome ?? ''}
+          aoCriar={(v) => {
+            viagens.definir([v, ...(viagens.dados ?? [])])
+            setCriando(false)
+          }}
+          aoCancelar={() => setCriando(false)}
+        />
+      ) : null}
 
       <Conteudo busca={viagens} esqueleto={<Esqueleto altura="16rem" />}>
         {(lista) => {
@@ -176,4 +191,143 @@ function Linha({ icone, texto }: { icone: 'calendario' | 'viagens' | 'local' | '
       <span style={{ fontSize: '0.88rem' }}>{texto}</span>
     </div>
   )
+}
+
+/**
+ * Criar uma viagem.
+ *
+ * <p>Vagas e custo por pessoa entram no cadastro porque são as duas
+ * perguntas que chegam no minuto seguinte ao anúncio. Sem elas, a viagem
+ * publicada gera trinta mensagens no grupo perguntando a mesma coisa.</p>
+ */
+function FormularioDeViagem({ slug, responsavelSugerido, aoCriar, aoCancelar }: {
+  slug: string
+  responsavelSugerido: string
+  aoCriar: (viagem: Viagem) => void
+  aoCancelar: () => void
+}) {
+  const [destino, setDestino] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [saida, setSaida] = useState(emUmMes(6))
+  const [retorno, setRetorno] = useState(emUmMes(22))
+  const [vagas, setVagas] = useState('40')
+  const [transporte, setTransporte] = useState('')
+  const [hospedagem, setHospedagem] = useState('')
+  const [custo, setCusto] = useState('')
+  const [responsavel, setResponsavel] = useState(responsavelSugerido)
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const viagem = await Dados.criarViagem(slug, {
+      destino: destino.trim(),
+      motivo: motivo.trim(),
+      saidaEm: new Date(saida).toISOString(),
+      retornoEm: new Date(retorno).toISOString(),
+      vagas: Number(vagas) || 1,
+      transporte: transporte.trim() === '' ? null : transporte.trim(),
+      hospedagem: hospedagem.trim() === '' ? null : hospedagem.trim(),
+      custoPorPessoa: custo === '' ? null : Number(custo),
+      responsavelNome: responsavel.trim() === '' ? null : responsavel.trim(),
+    })
+    setSalvando(false)
+    aoCriar(viagem)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Nova viagem</h3>
+      <p className="fraco">
+        Registrar cedo é o que permite orçar transporte com três empresas em
+        vez de fechar com a única disponível na véspera.
+      </p>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Destino</span>
+          <input value={destino} onChange={(e) => setDestino(e.target.value)}
+                 required maxLength={120} autoFocus placeholder="Porto Aurora, PR" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Motivo</span>
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
+                 required maxLength={140} placeholder="Interatlética Regional" />
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Saída</span>
+          <input type="datetime-local" value={saida} required
+                 onChange={(e) => setSaida(e.target.value)} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Retorno</span>
+          <input type="datetime-local" value={retorno} required
+                 onChange={(e) => setRetorno(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Vagas</span>
+          <input type="number" min={1} value={vagas} required
+                 onChange={(e) => setVagas(e.target.value)} />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Custo por pessoa (opcional)</span>
+          <input type="number" min={0} value={custo}
+                 onChange={(e) => setCusto(e.target.value)} placeholder="180" />
+          <span className="campo__dica">
+            A plataforma não cobra ninguém — o valor aqui é para combinar.
+          </span>
+        </label>
+      </div>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Transporte (opcional)</span>
+          <input value={transporte} onChange={(e) => setTransporte(e.target.value)}
+                 maxLength={120} placeholder="Ônibus fretado, saída do campus" />
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">Hospedagem (opcional)</span>
+          <input value={hospedagem} onChange={(e) => setHospedagem(e.target.value)}
+                 maxLength={120} placeholder="Alojamento da atlética anfitriã" />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">Quem organiza</span>
+        <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)}
+               maxLength={120} />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !destino.trim() || !motivo.trim()}>
+          {salvando ? 'Criando…' : 'Criar viagem'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** Padrão dos campos de data: daqui a um mês, na hora indicada. */
+function emUmMes(hora: number): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() + 1)
+  d.setHours(hora, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    + `T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

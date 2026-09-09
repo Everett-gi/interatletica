@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Dados } from '../../../dados'
 import type { EtapaDaParceria, Parceria, TipoDeParceria } from '../../../api/tipos-mercado'
@@ -13,6 +13,7 @@ import {
 import { Icone, type NomeDoIcone } from '../../../ui/icones'
 import { quando } from '../../../formatos'
 import { useSessao } from '../../../sessao/SessaoContexto'
+import type { AtleticaResumo } from '../../../api/tipos'
 
 const TIPO: Record<TipoDeParceria, { rotulo: string; icone: NomeDoIcone }> = {
   EMPRESA: { rotulo: 'Empresa', icone: 'mercado' },
@@ -44,6 +45,7 @@ export function Parcerias() {
   const minha = vinculo(slug)?.atletica
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
   const [confirmando, setConfirmando] = useState<Parceria | null>(null)
+  const [propondo, setPropondo] = useState(false)
 
   const parcerias = useBusca<Parceria[]>(() => Dados.parcerias(), [])
 
@@ -61,13 +63,24 @@ export function Parcerias() {
       <CabecalhoDePagina
         titulo="Parcerias"
         descricao="Benefícios abertos à rede, e acordos diretos entre duas atléticas."
-        acoes={
-          <button className="botao botao--discreto" disabled
-                  title="Propor parceria chega com a API conectada">
+        acoes={minha ? (
+          <button className="botao botao--discreto"
+                  onClick={() => setPropondo((v) => !v)}>
             <Icone nome="mais" tamanho={16} /> Propor parceria
           </button>
-        }
+        ) : undefined}
       />
+
+      {propondo && minha ? (
+        <FormularioDeParceria
+          minha={minha}
+          aoPropor={(p) => {
+            parcerias.definir([p, ...(parcerias.dados ?? [])])
+            setPropondo(false)
+          }}
+          aoCancelar={() => setPropondo(false)}
+        />
+      ) : null}
 
       <Conteudo
         busca={parcerias}
@@ -85,6 +98,11 @@ export function Parcerias() {
                   Comece propondo uma parceria entre atléticas: trocar acesso a
                   quadra e a espaço costuma não custar nada e resolve muito.
                 </p>
+                {minha && !propondo ? (
+                  <button className="botao" onClick={() => setPropondo(true)}>
+                    <Icone nome="mais" tamanho={16} /> Propor a primeira
+                  </button>
+                ) : null}
               </EstadoVazio>
             )
           }
@@ -231,5 +249,118 @@ export function Parcerias() {
         }}
       </Conteudo>
     </div>
+  )
+}
+
+/**
+ * Propor uma parceria à rede.
+ *
+ * <p>O benefício é campo separado da descrição, e obrigatório: "parceria com
+ * a gráfica do centro" sem dizer o que a outra atlética ganha não é
+ * proposta, é aviso. É o benefício que aparece no cartão e que faz alguém
+ * clicar.</p>
+ */
+function FormularioDeParceria({ minha, aoPropor, aoCancelar }: {
+  minha: AtleticaResumo
+  aoPropor: (parceria: Parceria) => void
+  aoCancelar: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [tipo, setTipo] = useState<TipoDeParceria>('EMPRESA')
+  const [parceiro, setParceiro] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [beneficio, setBeneficio] = useState('')
+  const [validade, setValidade] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault()
+    setSalvando(true)
+    const parceria = await Dados.proporParceria(minha, {
+      titulo: titulo.trim(),
+      tipo,
+      parceiroNome: parceiro.trim(),
+      descricao: descricao.trim(),
+      beneficio: beneficio.trim(),
+      validade: validade === '' ? null : new Date(`${validade}T23:59:00`).toISOString(),
+      cidade: minha.cidade,
+      uf: minha.uf,
+    })
+    setSalvando(false)
+    aoPropor(parceria)
+  }
+
+  return (
+    <form className="cartao" style={{ marginBottom: '1.4rem' }}
+          onSubmit={(e) => void enviar(e)}>
+      <h3>Propor parceria</h3>
+      <p className="fraco">
+        Um desconto que você fechou sozinho vale para uma atlética. Trazido
+        para a rede, vira poder de compra de vinte — e o fornecedor costuma
+        melhorar a proposta por causa disso.
+      </p>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que é</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+               required maxLength={140} autoFocus
+               placeholder="Desconto em impressão de banner e faixa" />
+      </label>
+
+      <div className="grade grade--dupla">
+        <label className="campo">
+          <span className="campo__rotulo">Tipo</span>
+          <select value={tipo}
+                  onChange={(e) => setTipo(e.target.value as TipoDeParceria)}>
+            {(Object.keys(TIPO) as TipoDeParceria[]).map((t) => (
+              <option key={t} value={t}>{TIPO[t].rotulo}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="campo">
+          <span className="campo__rotulo">
+            {tipo === 'ATLETICA' ? 'Atlética parceira' : 'Nome do parceiro'}
+          </span>
+          <input value={parceiro} onChange={(e) => setParceiro(e.target.value)}
+                 required maxLength={120}
+                 placeholder={tipo === 'ATLETICA' ? 'Atlética Leões' : 'Gráfica Central'} />
+        </label>
+      </div>
+
+      <label className="campo">
+        <span className="campo__rotulo">O que a outra atlética ganha</span>
+        <input value={beneficio} onChange={(e) => setBeneficio(e.target.value)}
+               required maxLength={160}
+               placeholder="20% de desconto e prazo de 5 dias" />
+        <span className="campo__dica">
+          É o que aparece no cartão. Sem isto, a proposta não é proposta.
+        </span>
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Detalhes</span>
+        <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                  required
+                  placeholder="Como acionar, com quem falar, o que já foi combinado." />
+      </label>
+
+      <label className="campo">
+        <span className="campo__rotulo">Vale até (opcional)</span>
+        <input type="date" value={validade}
+               onChange={(e) => setValidade(e.target.value)} />
+      </label>
+
+      <div className="linha">
+        <button className="botao" type="submit"
+                disabled={salvando || !titulo.trim() || !parceiro.trim()
+                  || !beneficio.trim() || !descricao.trim()}>
+          {salvando ? 'Publicando…' : 'Propor à rede'}
+        </button>
+        <button className="botao botao--fantasma" type="button" onClick={aoCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

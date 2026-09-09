@@ -14,7 +14,7 @@ import {
   useBusca,
   Vazio,
 } from '../../ui/componentes'
-import { dataEHora, hora } from '../../formatos'
+import { dataEHora, hora, plural } from '../../formatos'
 import { useSessao } from '../../sessao/SessaoContexto'
 
 /** A tela de trabalho da diretoria durante um evento. */
@@ -162,7 +162,7 @@ function Torneio({ slug, eventoId }: { slug: string; eventoId: string }) {
             ) : null}
           </div>
           <div className="fraco">
-            {torneio.modalidade} · {torneio.participantes.length} participantes ·{' '}
+            {torneio.modalidade} · {plural(torneio.participantes.length, 'participante')} ·{' '}
             {encerradas} de {torneio.partidas.length} partidas
           </div>
         </div>

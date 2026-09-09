@@ -1999,6 +1999,22 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .linha-marcavel:hover:not(:disabled) { background: var(--fundo-afundado); }
 .linha-marcavel:disabled { cursor: default; }
+
+/* Estrela clicavel de formulario de avaliacao. O alvo e maior que o
+   desenho: cinco criterios vezes cinco estrelas sao vinte e cinco alvos
+   numa tela, e no celular isso so funciona com folga. */
+.estrela-botao {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: none;
+  color: var(--texto-fraco);
+  cursor: pointer;
+}
+.estrela-botao[aria-pressed='true'],
+.estrela-botao:hover { color: var(--ouro); }
 .linha-marcavel > span:last-child:not(:first-child) { margin-left: auto; }
 
 /* ------------------------------------------------------------------ */

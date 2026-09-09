@@ -11,7 +11,7 @@ import {
   useBusca,
   Vazio,
 } from '../ui/componentes'
-import { dataEHora, quando } from '../formatos'
+import { dataEHora, plural, quando } from '../formatos'
 
 type Visao = 'ATLETICAS' | 'AGENDA'
 
@@ -159,7 +159,7 @@ function CartaoDeEvento({ item }: { item: ItemDaAgendaDaRede }) {
         <span className="fraco" style={{ flex: 1, minWidth: 0 }}>{atletica.nome}</span>
         {item.organizadoras > 1 ? (
           <span className="etiqueta etiqueta--acento">
-            {item.organizadoras} atléticas
+            {plural(item.organizadoras, 'atlética')}
           </span>
         ) : null}
       </div>

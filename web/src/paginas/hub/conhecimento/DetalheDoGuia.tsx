@@ -4,7 +4,7 @@ import type { Guia } from '../../../api/tipos-conhecimento'
 import { Brasao, Conteudo, Esqueleto, useBusca } from '../../../ui/componentes'
 import { CabecalhoDePagina, EstadoVazio, Secao } from '../../../ui/pagina'
 import { Icone } from '../../../ui/icones'
-import { quando } from '../../../formatos'
+import { plural, quando } from '../../../formatos'
 import { AREA } from '../rede/PedidosDeAjuda'
 
 /**
@@ -75,7 +75,7 @@ export function DetalheDoGuia() {
                       <div>
                         <strong>Este guia ajudou?</strong>
                         <div className="fraco">
-                          {g.util} atléticas marcaram como útil.
+                          {plural(g.util, 'atlética')} {g.util === 1 ? 'marcou' : 'marcaram'} como útil.
                         </div>
                       </div>
                       <button

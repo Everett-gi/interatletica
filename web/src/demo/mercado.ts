@@ -82,6 +82,8 @@ export const FORNECEDORES: Fornecedor[] = SEMENTES.map((s) => ({
   atendeRemoto: s.atendeRemoto,
   ultimaCompra: s.ultimaCompra,
   detalheDasNotas: s.detalhe,
+  // Os do catalogo ja vinham na rede: ninguem em particular os indicou.
+  indicadoPor: null,
 }))
 
 export const AVALIACOES: Record<string, AvaliacaoDeFornecedor[]> = {
