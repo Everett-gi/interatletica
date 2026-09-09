@@ -304,8 +304,16 @@ code {
 .grade--larga {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
 }
+/* Quatro por linha na largura tipica, que e o numero de indicadores de
+   quase toda tela — um minimo de 11rem cabia cinco, e a tela de seis
+   terminava com um orfao de um quinto de largura na segunda linha, que
+   parece defeito e nao decisao. */
 .grade--metricas {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13.5rem), 1fr));
+}
+/* Para as telas de seis: tres e tres, sem sobra. */
+@media (min-width: 900px) {
+  .grade--metricas--tres { grid-template-columns: repeat(3, 1fr); }
 }
 /* Dois campos lado a lado num formulario: cai para um so quando nao cabe. */
 .grade--dupla {
@@ -680,6 +688,15 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
   position: absolute;
   inset: 0;
   background: linear-gradient(160deg, rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.45));
+}
+
+/* A capa da porta de entrada. Puxa o acento do tema em vez de um azul
+   proprio: ela e a primeira tela que outra atletica ve, e prometer uma cor
+   que nenhuma das quarenta telas seguintes tem e comecar desalinhado. */
+.capa--principal {
+  background:
+    radial-gradient(120% 140% at 8% 0%, var(--acento-suave), transparent 62%),
+    linear-gradient(135deg, var(--acento-forte), #4c1d95);
 }
 .capa > * { position: relative; z-index: 1; }
 

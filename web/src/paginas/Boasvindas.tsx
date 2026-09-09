@@ -1,23 +1,40 @@
-import { Link } from 'react-router-dom'
-import { MODO_DEMO } from '../dados'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Dados, MODO_DEMO } from '../dados'
+import { useSessao } from '../sessao/SessaoContexto'
 import { Icone, type NomeDoIcone } from '../ui/icones'
 
 /**
  * O que um visitante deslogado vê na raiz.
  *
  * <p>Não é um feed. Quem chega aqui ou quer usar a plataforma, ou quer
- * entender o que ela é antes de decidir. As duas saídas ficam à vista, e a
- * ordem entre elas importa: <strong>começar do zero vem primeiro</strong>,
- * porque é o caminho de quem vai usar; a demonstração preenchida vem depois,
- * porque é o caminho de quem vai apresentar.</p>
+ * entender o que ela é antes de decidir — e a maioria das visitas é a
+ * segunda: alguém mostrando a plataforma para a diretoria de outra
+ * atlética.</p>
+ *
+ * <p>Por isso <strong>ver funcionando vem primeiro</strong>. A demonstração
+ * preenchida abre num clique, direto da capa: quem está sendo apresentado à
+ * plataforma não quer preencher quatro campos antes de ver do que ela é
+ * capaz. Criar a própria atlética fica ao lado, para quem já se convenceu.</p>
  */
 export function Boasvindas() {
+  const { recarregar } = useSessao()
+  const navegar = useNavigate()
+  const [abrindo, setAbrindo] = useState(false)
+
+  async function abrirDemonstracao() {
+    setAbrindo(true)
+    const perfil = await Dados.entrarDemo()
+    await recarregar()
+    navegar(`/hub/${perfil.atleticas[0].atletica.slug}`, { replace: true })
+  }
+
   return (
     <div className="pilha" style={{ gap: '2rem', maxWidth: '52rem', margin: '0 auto' }}>
-      <section
-        className="capa"
-        style={{ background: 'linear-gradient(135deg, #2b5fd0, #6d28d9)' }}
-      >
+      {/* O degrade sai dos tokens do tema, e nao de dois hex cravados: a
+          capa era a coisa mais saturada do produto inteiro e destoava de
+          todas as telas que ela promete mostrar. */}
+      <section className="capa capa--principal">
         <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
           Um escritório digital para a sua atlética — e uma rede para aprender
           com as outras
@@ -29,15 +46,39 @@ export function Boasvindas() {
         </p>
 
         <div className="linha">
-          <Link className="botao" style={{ background: '#fff', color: '#1a2540' }}
-                to="/criar-conta">
-            Começar do zero
+          {MODO_DEMO ? (
+            <button
+              className="botao"
+              style={{ background: '#fff', color: '#1a2540' }}
+              disabled={abrindo}
+              onClick={() => void abrirDemonstracao()}
+            >
+              <Icone nome="painel" tamanho={17} />
+              {abrindo ? 'Abrindo…' : 'Ver a plataforma funcionando'}
+            </button>
+          ) : null}
+          <Link
+            className={MODO_DEMO ? 'botao botao--discreto' : 'botao'}
+            to="/criar-conta"
+            style={MODO_DEMO
+              ? { borderColor: 'rgb(255 255 255 / 0.5)', color: '#fff' }
+              : { background: '#fff', color: '#1a2540' }}
+          >
+            Criar a minha atlética
           </Link>
-          <Link className="botao botao--discreto" to="/entrar"
-                style={{ borderColor: 'rgb(255 255 255 / 0.5)', color: '#fff' }}>
+          <Link className="botao botao--fantasma" to="/entrar"
+                style={{ color: '#fff' }}>
             Já tenho conta
           </Link>
         </div>
+
+        {MODO_DEMO ? (
+          <p style={{ margin: '0.9rem 0 0', fontSize: '0.84rem', opacity: 0.8 }}>
+            A demonstração abre como presidente de uma atlética fictícia com
+            dois anos de história: campeonato em andamento, financeiro fechado
+            e transição de gestão em curso.
+          </p>
+        ) : null}
       </section>
 
       <section>
@@ -107,27 +148,6 @@ export function Boasvindas() {
         </div>
       </section>
 
-      {MODO_DEMO ? (
-        <section className="cartao cartao--destacado">
-          <div className="linha linha--topo" style={{ gap: '0.7rem' }}>
-            <Icone nome="painel" tamanho={22} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ marginBottom: '0.2rem' }}>
-                Quer ver a plataforma cheia, sem preencher nada?
-              </h3>
-              <p className="fraco" style={{ marginBottom: '0.8rem' }}>
-                A demonstração preenchida abre como presidente de uma atlética
-                fictícia com dois anos de história — eventos, campeonato em
-                andamento, financeiro fechado e transição de gestão em curso.
-                Serve para apresentar; para experimentar, comece do zero.
-              </p>
-              <Link to="/entrar" className="botao botao--discreto">
-                Abrir a demonstração preenchida
-              </Link>
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   )
 }

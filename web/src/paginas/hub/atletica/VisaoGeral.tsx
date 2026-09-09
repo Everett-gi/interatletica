@@ -129,7 +129,8 @@ export function VisaoGeral() {
 
           return (
             <>
-              <div className="grade grade--metricas" style={{ marginBottom: '1.8rem' }}>
+              <div className="grade grade--metricas grade--metricas--tres"
+                   style={{ marginBottom: '1.8rem' }}>
                 <Metrica rotulo="Membros" icone="membros" para={`${base}/membros`}
                          valor={ativos.length} detalhe="com vínculo ativo" />
                 <Metrica rotulo="Equipes" icone="equipes" para={`${base}/equipes`}
