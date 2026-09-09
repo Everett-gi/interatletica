@@ -251,7 +251,8 @@ function Indicadores({ slug, funcao, dados }: {
     <div className="grade grade--metricas">
       <Metrica rotulo="Tarefas abertas" icone="tarefas" para={`${base}/tarefas`}
                valor={dados.tarefas.filter((t) => t.status !== 'CONCLUIDA').length}
-               detalhe={atrasadas > 0 ? `${atrasadas} atrasadas` : 'nenhuma atrasada'}
+               detalhe={atrasadas > 0
+                 ? `${plural(atrasadas, 'atrasada')}` : 'nenhuma atrasada'}
                cor={atrasadas > 0 ? 'var(--alerta)' : undefined} />
       <Metrica rotulo="Eventos próximos" icone="eventos" para={`${base}/eventos`}
                valor={dados.painel.proximosEventos.length} />

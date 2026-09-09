@@ -870,6 +870,29 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
   padding: 0.95rem 0.7rem 0.3rem;
 }
 
+/* O titulo do grupo vira o controle de abrir e fechar. Alvo de linha
+   inteira: o alvo e o nome do grupo, nao a setinha de 13px. */
+.lateral__titulo--botao {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.67rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 750;
+  color: var(--texto-fraco);
+  text-align: left;
+  cursor: pointer;
+}
+.lateral__titulo--botao > span:first-child { flex: 1; min-width: 0; }
+.lateral__titulo--botao:hover { color: var(--texto); }
+.lateral__titulo--botao .icone { opacity: 0.7; }
+.lateral__titulo--botao .lateral__selo { margin-right: 0.1rem; }
+
 .lateral__item {
   display: flex;
   align-items: center;
@@ -1060,13 +1083,34 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
   /* `.app__topo .busca` e não só `.busca`: a regra base define `flex: 1`
      mais adiante no arquivo, e sem o seletor mais específico ela venceria
      esta — o campo continuaria espremido na primeira linha. */
+
+  /* Encolhida vira uma lupa do tamanho dos outros botões do topo, e só
+     toma a linha inteira quando recebe o foco. Uma faixa de busca
+     permanente custava noventa pixels de toda tela do celular por algo
+     que se usa de vez em quando — e são noventa pixels tirados justamente
+     do conteúdo, que na tela pequena é o que já falta.
+
+     Sem JavaScript: a lupa é `pointer-events: none` sobre o campo, então
+     tocar nela foca o campo, e o `:focus-within` faz o resto. */
   .app__topo .busca {
     order: 10;
-    flex: 1 1 100%;
+    flex: 0 0 auto;
+    width: 2.4rem;
     max-width: none;
+    transition: width 0.16s ease;
+  }
+  .app__topo .busca:focus-within {
+    flex: 1 1 100%;
+    width: 100%;
   }
   .app__topo .busca__atalho { display: none; }
   .app__topo .busca__campo { padding-right: 0.7rem; }
+  /* Encolhido, o campo é só o alvo de toque da lupa: o cursor piscando num
+     campo de dois centímetros parece defeito. */
+  .app__topo .busca:not(:focus-within) .busca__campo {
+    color: transparent;
+    cursor: pointer;
+  }
 }
 
 /* Dois indicadores por linha no celular. Um por linha empurrava o conteúdo
@@ -1078,6 +1122,19 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
   }
   .grade--metricas .cartao { padding: 0.75rem 0.8rem; }
   .grade--metricas .numero-grande { font-size: 1.5rem; }
+
+  /* "Eventos próximos" quebra em duas linhas e "Em caixa" não, e os quatro
+     números acabam em quatro alturas diferentes — a linha de indicadores
+     perde o alinhamento que é a razão de ela existir. Reservar duas linhas
+     para o rótulo iguala todos. */
+  .grade--metricas .metrica__topo {
+    align-items: flex-start;
+    /* Entrelinha fixada para a conta fechar: duas linhas sao exatamente
+       2.5em, e o rotulo de uma linha e esticado ate a mesma altura. Com a
+       entrelinha herdada, um lado dava 34px e o outro 42. */
+    line-height: 1.25;
+    min-height: 2.5em;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -2015,6 +2072,38 @@ td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .estrela-botao[aria-pressed='true'],
 .estrela-botao:hover { color: var(--ouro); }
+
+/* ------------------------------------------------------------------ */
+/* Faixa de previa                                                    */
+/* ------------------------------------------------------------------ */
+
+/* Uma linha, nao um paragrafo. O aviso precisa existir — a tela nao
+   salva no servidor — mas quem abriu o financeiro veio ver o saldo, e
+   quatro linhas de explicacao antes do primeiro numero e o tipo de coisa
+   que faz a plataforma parecer um aviso legal. O detalhe fica a um
+   clique, para quem perguntar. */
+.previa {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--fundo-afundado);
+}
+.previa__linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.previa__texto {
+  font-size: 0.86rem;
+  color: var(--texto-suave);
+}
+.previa__linha .ligacao { font-size: 0.82rem; }
+.previa__detalhe {
+  margin: 0.5rem 0 0;
+  font-size: 0.84rem;
+}
 .linha-marcavel > span:last-child:not(:first-child) { margin-left: auto; }
 
 /* ------------------------------------------------------------------ */

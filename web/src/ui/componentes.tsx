@@ -427,20 +427,29 @@ export function Dialogo({ titulo, aoFechar, children }: {
  * incompleto. Dizer "ainda não" em voz alta custa menos que essa confusão.</p>
  */
 export function Previa({ oQueFalta }: { oQueFalta: string }) {
+  const [aberto, setAberto] = useState(false)
+
   return (
-    <div className="aviso aviso--alerta" style={{ marginBottom: '1rem' }}>
-      <div className="linha" style={{ gap: '0.5rem' }}>
+    <div className="previa">
+      <div className="previa__linha">
         <span className="etiqueta etiqueta--alerta">prévia</span>
-        <strong>Esta tela ainda não fala com o servidor</strong>
+        <span className="previa__texto">Esta tela ainda não fala com o servidor</span>
+        <button className="ligacao" onClick={() => setAberto((v) => !v)}
+                aria-expanded={aberto}>
+          {aberto ? 'ocultar' : 'o que isso quer dizer?'}
+        </button>
       </div>
-      <p className="fraco" style={{ margin: '0.3rem 0 0' }}>
-        {oQueFalta} O banco já tem a tabela; falta o endpoint na API.{' '}
-        {MODO_DEMO
-          ? 'Na demonstração o que você fizer fica guardado neste navegador: '
-            + 'volta ao recarregar, some se você limpar os dados do site, e '
-            + 'ninguém mais enxerga.'
-          : 'Até lá, o que você fizer aqui vale só nesta aba.'}
-      </p>
+
+      {aberto ? (
+        <p className="fraco previa__detalhe">
+          {oQueFalta} O banco já tem a tabela; falta o endpoint na API.{' '}
+          {MODO_DEMO
+            ? 'Na demonstração o que você fizer fica guardado neste navegador: '
+              + 'volta ao recarregar, some se você limpar os dados do site, e '
+              + 'ninguém mais enxerga.'
+            : 'Até lá, o que você fizer aqui vale só nesta aba.'}
+        </p>
+      ) : null}
     </div>
   )
 }

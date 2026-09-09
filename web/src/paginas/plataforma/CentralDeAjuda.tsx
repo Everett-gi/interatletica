@@ -4,7 +4,7 @@ import { Dados, MODO_DEMO } from '../../dados'
 import { CabecalhoDePagina, Chips, Confirmacao, EstadoVazio, Secao } from '../../ui/pagina'
 import { Icone, type NomeDoIcone } from '../../ui/icones'
 import { useSessao } from '../../sessao/SessaoContexto'
-import { reiniciarAjuda } from '../../ui/ComoFunciona'
+import { ajudaAbreSozinha, reiniciarAjuda, silenciarAjuda } from '../../ui/ComoFunciona'
 import { reiniciarTour } from '../../layout/TourInicial'
 
 interface Pergunta {
@@ -170,6 +170,7 @@ export function CentralDeAjuda() {
   const [aberta, setAberta] = useState<string | null>(null)
   const [reiniciado, setReiniciado] = useState<'ajuda' | 'tour' | null>(null)
   const [confirmandoReinicio, setConfirmandoReinicio] = useState(false)
+  const [modoAprendiz, setModoAprendiz] = useState(ajudaAbreSozinha)
 
   const alvo = termo.trim().toLowerCase()
   const visiveis = PERGUNTAS
@@ -261,23 +262,36 @@ export function CentralDeAjuda() {
 
       <Secao
         titulo="Aprender a usar"
-        descricao="Cada tela explica o que é na primeira vez que você entra nela. Isso pode ser reativado a qualquer momento."
+        descricao="Toda tela traz a explicação do que ela é, encolhida numa linha acima do título. Quem está começando pode pedir que elas abram sozinhas."
       >
         <div className="grade">
           <div className="cartao">
             <Icone nome="info" tamanho={22} />
             <h3 style={{ marginTop: '0.5rem', marginBottom: '0.2rem' }}>
-              Reabrir as explicações
+              Explicações abertas
             </h3>
             <p className="fraco" style={{ marginBottom: '0.8rem' }}>
-              As caixas de "o que é esta tela" voltam a aparecer em todos os
-              módulos. Útil quando entra gente nova na diretoria.
+              {modoAprendiz
+                ? 'Cada tela abre com a explicação já aberta. Bom para quem '
+                  + 'acabou de entrar na diretoria; atrapalha quem já conhece.'
+                : 'Hoje a explicação vem encolhida numa linha e abre num '
+                  + 'clique. Ligue se entrou gente nova na diretoria.'}
             </p>
             <button
               className="botao botao--discreto"
-              onClick={() => { reiniciarAjuda(); setReiniciado('ajuda') }}
+              onClick={() => {
+                if (modoAprendiz) {
+                  silenciarAjuda()
+                  setModoAprendiz(false)
+                  setReiniciado(null)
+                } else {
+                  reiniciarAjuda()
+                  setModoAprendiz(true)
+                  setReiniciado('ajuda')
+                }
+              }}
             >
-              Reabrir em todas as telas
+              {modoAprendiz ? 'Voltar a encolher' : 'Abrir em todas as telas'}
             </button>
           </div>
 
@@ -325,7 +339,7 @@ export function CentralDeAjuda() {
         {reiniciado ? (
           <div className="aviso aviso--sucesso" style={{ marginTop: '0.9rem' }}>
             {reiniciado === 'ajuda'
-              ? 'Pronto. As explicações voltam a aparecer conforme você abrir cada tela.'
+              ? 'Pronto. As explicações passam a abrir sozinhas em cada tela.'
               : 'Pronto. O tour começa quando você voltar para a sua atlética.'}
           </div>
         ) : null}
