@@ -49,10 +49,11 @@ const PARADAS: Parada[] = [
     icone: 'menu',
     titulo: 'Tudo em grupos, não em lista',
     texto:
-      'A navegação é agrupada por assunto: a sua atlética, a gestão do dia a '
-      + 'dia, eventos, esportes, financeiro, a rede, o conhecimento, o mercado '
-      + 'e a comunicação. Você não precisa conhecer os quarenta destinos — só '
-      + 'o grupo onde a sua pergunta mora.',
+      'Onze grupos por assunto: a sua atlética, a gestão do dia a dia, '
+      + 'eventos, esportes, financeiro, a rede, o conhecimento, o mercado e a '
+      + 'comunicação. Só o grupo em que você está fica aberto — clique no nome '
+      + 'de outro para abrir. Você não precisa conhecer os quarenta destinos, '
+      + 'só o grupo onde a sua pergunta mora.',
   },
   {
     alvo: '.contexto__botao',
@@ -73,14 +74,14 @@ const PARADAS: Parada[] = [
       + 'sua atlética aparece primeiro. O atalho é Ctrl + K.',
   },
   {
-    alvo: '.como-funciona',
+    alvo: '.como-funciona__gatilho',
     icone: 'info',
     titulo: 'Cada tela explica o que é',
     texto:
-      'Esta caixa aparece na primeira vez que você entra em cada tela, dizendo '
-      + 'para que ela serve e como se usa. Depois de dispensada, encolhe para '
-      + 'uma linha que reabre num clique — nunca some de vez, porque a próxima '
-      + 'diretoria vai chegar aqui sem ter visto nada.',
+      'Esta linha existe no topo de todas as telas e abre num clique: diz para '
+      + 'que a tela serve, como se usa e por que ela é assim. Nunca some, '
+      + 'porque a próxima diretoria vai chegar aqui sem ter visto nada — e na '
+      + 'central de ajuda dá para pedir que todas abram sozinhas.',
   },
 ]
 
