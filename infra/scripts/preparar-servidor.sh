@@ -64,6 +64,18 @@ for par in "tcp 80" "tcp 443" "udp 443"; do
     fi
 done
 
+passo "atualização de segurança com reinício às 4h30"
+# O unattended-upgrades do Ubuntu já instala correção de segurança todo
+# dia, mas correção de kernel só vale depois de reiniciar — e ninguém
+# entra numa VM de atlética para isso. 4h30 fica depois do backup das
+# 3h30; containers e timers voltam sozinhos, e só reinicia quando alguma
+# atualização pediu.
+cat > /etc/apt/apt.conf.d/52interatletica-reinicio <<'EOF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:30";
+EOF
+
 passo "serviços que não servem aqui"
 # rpcbind é do NFS e escutava em 0.0.0.0:111 sem motivo.
 systemctl disable --now rpcbind.socket rpcbind.service >/dev/null 2>&1 || true
