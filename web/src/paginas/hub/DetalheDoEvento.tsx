@@ -33,7 +33,7 @@ export function DetalheDoEvento() {
     setOcupado(true)
     setFalha(null)
     try {
-      await Dados.mudarStatusDoEvento(eventoId, status)
+      await Dados.mudarStatusDoEvento(slug, eventoId, status)
       busca.recarregar()
     } catch (erro) {
       setFalha(erro)

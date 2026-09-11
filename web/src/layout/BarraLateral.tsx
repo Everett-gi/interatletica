@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import type { Papel } from '../api/tipos'
+import { MODO_DEMO } from '../dados'
 import { Icone } from '../ui/icones'
 import {
   NAVEGACAO,
@@ -41,7 +42,8 @@ export function BarraLateral({
   const [alternados, setAlternados] = useState<Record<string, boolean>>({})
 
   const podeVer = (item: ItemDeNavegacao) =>
-    item.exige === undefined || podeAtuarComo(slug, item.exige)
+    (MODO_DEMO || !item.semServidor)
+    && (item.exige === undefined || podeAtuarComo(slug, item.exige))
 
   /**
    * O grupo da rota atual.

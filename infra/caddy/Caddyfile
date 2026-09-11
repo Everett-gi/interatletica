@@ -1,7 +1,16 @@
 # =====================================================================
 # Interatlética — Caddy
 #
-# Domínio único para API e PWA. Isso não é preguiça: mantém o cookie de
+# Dois endereços, um servidor:
+#
+#   {$DOMINIO}        o app — demonstração ou real, conforme WEB_IMAGEM
+#   demo.{$DOMINIO}   a demonstração, sempre
+#
+# Ter a demonstração num endereço próprio é o que permite trocar o
+# principal para o app real sem perder a ferramenta de apresentação — e
+# sem que quem está sendo apresentado esbarre numa tela de login.
+#
+# API e PWA no mesmo domínio. Isso não é preguiça: mantém o cookie de
 # sessão same-site, elimina preflight de CORS e reduz a superfície de
 # configuração. Separar em api.dominio depois é uma linha de mudança.
 # =====================================================================
@@ -17,13 +26,10 @@
 	}
 }
 
-{$DOMINIO} {
-
-	encode zstd gzip
-
-	# -----------------------------------------------------------------
-	# Cabeçalhos de segurança
-	# -----------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Cabeçalhos de segurança
+# ---------------------------------------------------------------------
+(seguranca) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options    "nosniff"
@@ -40,10 +46,13 @@
 		-Server
 		-X-Powered-By
 	}
+}
 
-	# -----------------------------------------------------------------
-	# API
-	# -----------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Tudo o que fala com o Spring. O fluxo OAuth vive fora de /api, e o
+# actuator nunca é exposto publicamente.
+# ---------------------------------------------------------------------
+(servidor) {
 	handle /api/* {
 		reverse_proxy api:8080 {
 			header_up X-Real-IP {remote_host}
@@ -51,34 +60,46 @@
 			health_interval 30s
 		}
 	}
-
-	# Fluxo OAuth do Spring Security vive fora de /api.
 	handle /oauth2/* {
 		reverse_proxy api:8080
 	}
 	handle /login/oauth2/* {
 		reverse_proxy api:8080
 	}
-
-	# Actuator nunca é exposto publicamente.
 	handle /actuator/* {
 		respond 404
 	}
+}
 
-	# -----------------------------------------------------------------
-	# PWA
-	# -----------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Cache da PWA. O service worker precisa ser revalidado sempre, senão o
+# usuário fica preso numa versão antiga do app por dias; o que tem hash
+# no nome nunca muda de conteúdo e pode ficar um ano.
+# ---------------------------------------------------------------------
+(cache_da_pwa) {
+	@service_worker path /sw.js /manifest.webmanifest
+	header @service_worker Cache-Control "no-cache, must-revalidate"
+
+	@versao path /versao.json
+	header @versao Cache-Control "no-store"
+
+	@estaticos path /assets/*
+	header @estaticos Cache-Control "public, max-age=31536000, immutable"
+}
+
+# ---------------------------------------------------------------------
+# O app
+# ---------------------------------------------------------------------
+{$DOMINIO} {
+	encode zstd gzip
+	import seguranca
+	import servidor
+
 	handle {
 		reverse_proxy web:80
 	}
 
-	# O service worker precisa ser revalidado sempre, senão o usuário
-	# fica preso numa versão antiga do app por dias.
-	@service_worker path /sw.js /manifest.webmanifest
-	header @service_worker Cache-Control "no-cache, must-revalidate"
-
-	@estaticos path /assets/*
-	header @estaticos Cache-Control "public, max-age=31536000, immutable"
+	import cache_da_pwa
 
 	log {
 		output file /data/acesso.log {
@@ -87,6 +108,22 @@
 		}
 		format json
 	}
+}
+
+# ---------------------------------------------------------------------
+# A demonstração, sempre aqui, com dados fictícios e sem servidor. Não
+# importa /servidor de propósito: a demo não chama a API, e deixar a
+# rota aberta só daria uma segunda porta para a mesma coisa.
+# ---------------------------------------------------------------------
+demo.{$DOMINIO} {
+	encode zstd gzip
+	import seguranca
+
+	handle {
+		reverse_proxy web-demo:80
+	}
+
+	import cache_da_pwa
 }
 
 # ---------------------------------------------------------------------

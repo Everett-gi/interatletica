@@ -61,3 +61,15 @@ services:
   web:
     image: ${WEB_IMAGEM:?defina WEB_IMAGEM no .env}:${IMAGEM_TAG:?IMAGEM_TAG vazio - quem define e o deploy.sh}
     build: !reset null
+
+  # A demonstração no endereço demo.{DOMINIO}, sempre — independente do
+  # que o endereço principal estiver servindo. São 4 MB de nginx; o que
+  # ela economiza é ter de derrubar o app real para apresentar a
+  # plataforma a uma diretoria.
+  web-demo:
+    image: ${WEB_DEMO_IMAGEM:-ghcr.io/everett-gi/interatletica-web-demo}:${IMAGEM_TAG:?IMAGEM_TAG vazio - quem define e o deploy.sh}
+    container_name: interatletica-web-demo
+    restart: unless-stopped
+    networks: [borda]
+    security_opt:
+      - no-new-privileges:true

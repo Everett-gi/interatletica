@@ -58,6 +58,41 @@ public final class AtleticaDtos {
     ) {
     }
 
+    /**
+     * A atlética criada por quem vai presidi-la.
+     *
+     * <p>Não tem {@code emailDoPresidente}: o presidente é quem está pedindo.
+     * A cor entra aqui porque a tela de criação já pergunta — e identidade
+     * visual em branco faz toda atlética nova nascer igual.</p>
+     */
+    public record NovaAtleticaPropria(
+            @NotBlank(message = "informe o nome da atlética")
+            @Size(max = 140)
+            String nome,
+
+            @Size(max = 20)
+            String sigla,
+
+            @NotBlank(message = "informe a instituição de ensino")
+            @Size(max = 160)
+            String instituicao,
+
+            @Size(max = 90)
+            String cidade,
+
+            @Pattern(regexp = "^[A-Z]{2}$", message = "use a sigla da UF em maiúsculas, ex.: SP")
+            String uf,
+
+            @Pattern(regexp = "^[a-z0-9]+(-[a-z0-9]+)*$",
+                     message = "use apenas letras minúsculas, números e hífen")
+            @Size(max = 60)
+            String slug,
+
+            @Pattern(regexp = HEX, message = "use cor em hexadecimal, ex.: #1B3A6F")
+            String corPrimaria
+    ) {
+    }
+
     public record AtualizacaoDeAtletica(
             @NotBlank @Size(max = 140) String nome,
             @Size(max = 20) String sigla,

@@ -295,7 +295,9 @@ function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMuda
 
   async function alterar(papel: Papel) {
     setOcupado(true)
-    await Dados.alterarPapel(slug, membro.id, papel)
+    // O cargo viaja junto: no servidor papel e cargo são o mesmo PUT, e
+    // mandar cargo nulo apagaria "Diretora financeira" ao promover alguém.
+    await Dados.alterarPapel(slug, membro.id, papel, membro.cargo)
     setOcupado(false)
     aoMudar()
   }
@@ -356,7 +358,7 @@ function CartaoDeMembro({ slug, membro, podeGerenciar, presidentesAtivos, aoMuda
             disabled={ocupado}
             onClick={() => {
               setOcupado(true)
-              void Dados.definirCargo(slug, membro.id, cargo).then(() => {
+              void Dados.definirCargo(slug, membro.id, cargo, membro.papel).then(() => {
                 setOcupado(false)
                 setEditandoCargo(false)
                 aoMudar()

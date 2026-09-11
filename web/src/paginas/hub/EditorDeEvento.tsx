@@ -82,7 +82,7 @@ export function EditorDeEvento() {
     setFalha(null)
     try {
       const salvo = eventoId
-        ? await Dados.atualizarEvento(eventoId, dados)
+        ? await Dados.atualizarEvento(slug, eventoId, dados)
         : await Dados.criarEvento(slug, dados)
       navegar(`/hub/${slug}/eventos/${salvo?.id ?? ''}`, { replace: true })
     } catch (erro) {

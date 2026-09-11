@@ -157,7 +157,8 @@ function MenuDeCriacao({ slug }: { slug: string }) {
   const { podeAtuarComo } = useSessao()
   const menu = useMenu<HTMLDivElement>()
   const disponiveis = ACOES_RAPIDAS.filter(
-    (acao) => acao.exige === undefined || podeAtuarComo(slug, acao.exige))
+    (acao) => (MODO_DEMO || !acao.semServidor)
+      && (acao.exige === undefined || podeAtuarComo(slug, acao.exige)))
 
   if (disponiveis.length === 0) return null
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
-import { Dados } from '../dados'
+import { Dados, MODO_DEMO } from '../dados'
 import type { Decisao } from '../api/tipos-gestao'
 import type { Tarefa } from '../api/tipos-rede'
 import type { PedidoDeAjuda } from '../api/tipos-conhecimento'
@@ -133,7 +133,10 @@ function useContagens(slug: string, ativo: boolean): ContagensDaNavegacao {
     { tarefas: 0, decisoes: 0, ajuda: 0 })
 
   useEffect(() => {
-    if (!ativo || !slug) return
+    // Os três contadores vêm de módulos sem endpoint. No app real não há o
+    // que contar, e pedir isso a cada troca de atlética seria trabalho para
+    // devolver zero.
+    if (!ativo || !slug || !MODO_DEMO) return
     let cancelado = false
 
     void Promise.all([

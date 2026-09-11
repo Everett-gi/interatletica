@@ -4,6 +4,7 @@ import br.com.interatletica.atletica.AtleticaDtos.AtleticaResposta;
 import br.com.interatletica.atletica.AtleticaDtos.AtleticaResumo;
 import br.com.interatletica.atletica.AtleticaDtos.MudancaDeSituacao;
 import br.com.interatletica.atletica.AtleticaDtos.NovaAtletica;
+import br.com.interatletica.atletica.AtleticaDtos.NovaAtleticaPropria;
 import br.com.interatletica.atletica.ServicoDeAtletica.AtleticaCriada;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -60,6 +61,21 @@ public class PlataformaController {
     @PreAuthorize("@permissao.operador()")
     public AtleticaCriada criar(@Valid @RequestBody NovaAtletica dados) {
         return servico.criar(dados);
+    }
+
+    /**
+     * Cria a atlética de quem está pedindo — sem convite, porque quem cria já
+     * é o presidente.
+     *
+     * <p>Aberta a qualquer pessoa autenticada enquanto a plataforma está em
+     * teste. A porta do {@link #criar} continua existindo para quando a
+     * entrada voltar a ser só por operador: as duas convivem, e trocar de
+     * regime é deixar de expor esta.</p>
+     */
+    @PostMapping("/api/atleticas/minha")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AtleticaResposta criarMinha(@Valid @RequestBody NovaAtleticaPropria dados) {
+        return servico.criarMinha(dados);
     }
 
     @PutMapping("/api/atleticas/{slug}/situacao")

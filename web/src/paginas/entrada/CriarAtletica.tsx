@@ -65,10 +65,16 @@ export function CriarAtletica() {
 
   async function criar() {
     setCriando(true)
-    const atletica = await Dados.criarAtleticaDemo({
-      nome, sigla: sigla || null, instituicao,
-      cidade: cidade || null, uf: uf || null, corPrimaria: cor,
+    const atletica = await Dados.criarAtletica({
+      nome: nome.trim(),
+      sigla: sigla.trim() || null,
+      instituicao: instituicao.trim(),
+      cidade: cidade.trim() || null,
+      uf: uf.trim() || null,
+      corPrimaria: cor,
     })
+    // A sessão passa a ter um vínculo que ela não tinha: é ele que decide o
+    // que a barra lateral mostra e para onde a raiz manda.
     await recarregar()
     navegar(`/hub/${atletica.slug}/boas-vindas`, { replace: true })
   }

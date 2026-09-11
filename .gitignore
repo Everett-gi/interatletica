@@ -2,6 +2,9 @@
 .env
 *.pem
 *.key
+# Credencial baixada do console do Google — nunca entra no repositorio,
+# que e publico.
+client_secret*.json
 
 # Java / Maven
 target/

@@ -272,6 +272,8 @@ Não existe autocadastro, então a primeira atlética precisa de alguém que abr
 
 Os passos 2 e 3 são uma transação só: atlética sem presidente é registro morto, e sair com a atlética criada e o convite não criado produziria exatamente esse estado.
 
+**Durante os testes, a porta está aberta.** Quem entra com o Google cria a própria atlética — `POST /api/atleticas/minha` — e já nasce presidente dela, sem convite: não haveria a quem enviar, e atlética e vínculo nascem na mesma transação pelo mesmo motivo de sempre. O teto de três presidências por conta é o freio contra o clique repetido e contra atlética inventada enquanto não existe moderação. A porta do operador continua valendo, e voltar ao regime fechado é deixar de expor a rota aberta.
+
 ---
 
 ## Rodando
@@ -289,6 +291,8 @@ A API sobe em `:8080` atrás do Caddy. O Flyway aplica a migration na primeira s
 ### Produção
 
 Uma VM E2.1.Micro da Oracle (free tier: 1 GB de RAM, 1/8 de OCPU) em `129.148.43.144`, com o compose inteiro — Caddy, PWA, API e Postgres. Enquanto não há domínio próprio, o endereço é `https://interatletica.duckdns.org` (DuckDNS, gratuito). O `129-148-43-144.sslip.io` do primeiro dia e o `http://` do IP redirecionam para ele. `https://` direto no IP não tem como responder: certificado se emite para nome, e o navegador vê a conexão encerrada.
+
+**Dois endereços.** O principal serve o app — demonstração ou real, conforme `WEB_IMAGEM` —, e `demo.` serve sempre a demonstração. Ter os dois é o que permite ligar o app real sem perder a ferramenta de apresentação, e sem que quem está sendo apresentado à plataforma esbarre numa tela de login. A troca é `./infra/scripts/usar-app-real.sh`, que **recusa ligar o app real enquanto a credencial do Google for placeholder**: sem ela o login falha no próprio Google, e o endereço principal viraria uma porta trancada — um erro que só apareceria para quem tentasse entrar.
 
 O caminho de um commit até o ar:
 
@@ -387,7 +391,9 @@ Falta antes de considerar a fase encerrada: testes de integração com Testconta
 
 **Fases 2 a 7 — front implementado, API pendente**
 
-O front cobre hoje os módulos de gestão, eventos e esportes, financeiro, rede, conhecimento, mercado e comunicação — navegáveis, com dados fictícios coerentes entre si e um cabeçalho de *prévia* em cada tela que ainda não persiste. A ordem de implementação da API acompanha o valor por esforço:
+O front cobre hoje os módulos de gestão, eventos e esportes, financeiro, rede, conhecimento, mercado e comunicação — navegáveis, com dados fictícios coerentes entre si e um cabeçalho de *prévia* em cada tela que ainda não persiste.
+
+**No app real esses módulos não aparecem.** Cada item da navegação carrega `semServidor` em `layout/navegacao.ts`, e quem digita o endereço direto recebe um aviso em vez da tela. A fachada faz o mesmo com os dados: fora da demonstração, o que não tem endpoint devolve vazio, e não ficção. Mostrar número fictício ao lado do que a atlética cadastrou de verdade é o jeito mais fácil de uma diretoria decidir em cima do que não existe — e some junto a dúvida de "isso salvou ou não?". Cada módulo volta à navegação quando ganhar API. A ordem de implementação acompanha o valor por esforço:
 
 | Fase | Escopo | Estado |
 |---|---|---|

@@ -1,10 +1,12 @@
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Outlet, Route, Routes } from 'react-router-dom'
+import { MODO_DEMO } from './dados'
 import { Aparelho } from './layout/Aparelho'
 
 import { Onboarding } from './paginas/plataforma/Onboarding'
 
 // Início e minha atlética.
 import { Painel } from './paginas/hub/Painel'
+import { PainelReal } from './paginas/hub/PainelReal'
 import { VisaoGeral } from './paginas/hub/atletica/VisaoGeral'
 import { Membros } from './paginas/hub/Membros'
 import { Diretoria } from './paginas/hub/atletica/Diretoria'
@@ -92,104 +94,122 @@ import { Relatorios } from './paginas/hub/Relatorios'
  * porta do ginásio — pagar pelo app inteiro antes de mostrar a primeira
  * linha.</p>
  *
- * <p>O `App` importa isto com `lazy`, então o download acontece quando
- * alguém entra em `/hub/…`, e não antes.</p>
+ * <p><strong>Dois conjuntos.</strong> Em cima, o que fala com o servidor:
+ * atlética, membros, eventos, inscrições. Embaixo, atrás de um portão, o que
+ * ainda só existe na demonstração. No app real esse portão explica a
+ * ausência em vez de mostrar dado fictício — quem digita o endereço direto
+ * merece a mesma resposta que a barra lateral dá ao esconder o item.</p>
  */
 export default function RotasDoHub() {
   return (
     <Routes>
       <Route element={<Aparelho />}>
-        <Route index element={<Painel />} />
+        {/* O que existe de verdade. */}
+        <Route index element={MODO_DEMO ? <Painel /> : <PainelReal />} />
         <Route path="boas-vindas" element={<Onboarding />} />
-
-        {/* Minha atlética */}
-        <Route path="atletica" element={<VisaoGeral />} />
         <Route path="membros" element={<Membros />} />
         <Route path="diretoria" element={<Diretoria />} />
-        <Route path="gestao" element={<Gestoes />} />
-        <Route path="gestao/transicao" element={<Transicao />} />
-        <Route path="gestao/:ano" element={<RelatorioDaGestao />} />
-        <Route path="documentos" element={<Documentos />} />
-        <Route path="patrimonio" element={<Patrimonio />} />
-
-        {/* Gestão */}
-        <Route path="tarefas" element={<Tarefas />} />
-        <Route path="projetos" element={<Projetos />} />
-        <Route path="projetos/novo" element={<NovoProjeto />} />
-        <Route path="projetos/:id" element={<DetalheDoProjeto />} />
-        <Route path="reunioes" element={<Reunioes />} />
-        <Route path="reunioes/:id" element={<DetalheDaReuniao />} />
-        <Route path="decisoes" element={<Decisoes />} />
-        <Route path="decisoes/:id" element={<DetalheDaDecisao />} />
-        <Route path="metas" element={<Metas />} />
-
-        {/* Eventos */}
-        <Route path="calendario" element={<Calendario />} />
         <Route path="eventos" element={<Eventos />} />
         <Route path="eventos/novo" element={<EditorDeEvento />} />
         <Route path="eventos/:eventoId" element={<DetalheDoEvento />} />
         <Route path="eventos/:eventoId/editar" element={<EditorDeEvento />} />
-        <Route path="eventos/:eventoId/torneio" element={<Chaveamento />} />
-        <Route path="campeonatos" element={<Campeonatos />} />
-        <Route path="campeonatos/:id" element={<DetalheDoCampeonato />} />
         <Route path="inscricoes" element={<Inscricoes />} />
-        <Route path="viagens" element={<Viagens />} />
 
-        {/* Esportes */}
-        <Route path="equipes" element={<Equipes />} />
-        <Route path="equipes/:id" element={<DetalheDaEquipe />} />
-        <Route path="atletas" element={<Atletas />} />
-        <Route path="jogos" element={<Jogos />} />
-        <Route path="resultados" element={<Resultados />} />
+        {/* O que ainda não tem endpoint. */}
+        <Route element={<PortaoDaDemonstracao />}>
+          <Route path="atletica" element={<VisaoGeral />} />
+          <Route path="gestao" element={<Gestoes />} />
+          <Route path="gestao/transicao" element={<Transicao />} />
+          <Route path="gestao/:ano" element={<RelatorioDaGestao />} />
+          <Route path="documentos" element={<Documentos />} />
+          <Route path="patrimonio" element={<Patrimonio />} />
 
-        {/* Financeiro */}
-        <Route path="financeiro" element={<Financeiro />} />
-        <Route path="financeiro/receitas" element={<Lancamentos natureza="RECEITA" />} />
-        <Route path="financeiro/despesas" element={<Lancamentos natureza="DESPESA" />} />
-        <Route path="financeiro/orcamento" element={<Orcamento />} />
-        <Route path="financeiro/prestacao-de-contas" element={<PrestacaoDeContas />} />
+          <Route path="tarefas" element={<Tarefas />} />
+          <Route path="projetos" element={<Projetos />} />
+          <Route path="projetos/novo" element={<NovoProjeto />} />
+          <Route path="projetos/:id" element={<DetalheDoProjeto />} />
+          <Route path="reunioes" element={<Reunioes />} />
+          <Route path="reunioes/:id" element={<DetalheDaReuniao />} />
+          <Route path="decisoes" element={<Decisoes />} />
+          <Route path="decisoes/:id" element={<DetalheDaDecisao />} />
+          <Route path="metas" element={<Metas />} />
 
-        {/* Rede */}
-        <Route path="rede" element={<ExplorarAtleticas />} />
-        <Route path="rede/feed" element={<Feed />} />
-        <Route path="rede/comunidades" element={<Comunidades />} />
-        <Route path="rede/comunidades/:id" element={<DetalheDaComunidade />} />
-        <Route path="rede/parcerias" element={<Parcerias />} />
-        <Route path="rede/ajuda" element={<PedidosDeAjuda />} />
-        <Route path="rede/ajuda/:id" element={<DetalheDoPedido />} />
-        <Route path="rede/amistosos" element={<Amistosos />} />
+          <Route path="calendario" element={<Calendario />} />
+          <Route path="eventos/:eventoId/torneio" element={<Chaveamento />} />
+          <Route path="campeonatos" element={<Campeonatos />} />
+          <Route path="campeonatos/:id" element={<DetalheDoCampeonato />} />
+          <Route path="viagens" element={<Viagens />} />
 
-        {/* Conhecimento */}
-        <Route path="conhecimento" element={<Guias />} />
-        <Route path="conhecimento/guias/:id" element={<DetalheDoGuia />} />
-        <Route path="conhecimento/modelos" element={<Modelos />} />
-        <Route path="conhecimento/experiencias" element={<Experiencias />} />
-        <Route path="conhecimento/experiencias/:id" element={<DetalheDaExperiencia />} />
-        <Route path="conhecimento/mentoria" element={<Mentoria />} />
-        <Route path="conhecimento/talentos" element={<Talentos />} />
+          <Route path="equipes" element={<Equipes />} />
+          <Route path="equipes/:id" element={<DetalheDaEquipe />} />
+          <Route path="atletas" element={<Atletas />} />
+          <Route path="jogos" element={<Jogos />} />
+          <Route path="resultados" element={<Resultados />} />
 
-        {/* Mercado */}
-        <Route path="mercado/fornecedores" element={<Fornecedores />} />
-        <Route path="mercado/fornecedores/:id" element={<DetalheDoFornecedor />} />
-        <Route path="mercado/oportunidades" element={<Oportunidades />} />
-        <Route path="mercado/compras" element={<ComprasColetivas />} />
-        {/* O feed aponta para uma compra específica; a lista já mostra todas
-            e destaca a que interessa, então não há detalhe separado. */}
-        <Route path="mercado/compras/:id" element={<ComprasColetivas />} />
-        <Route path="mercado/patrocinios" element={<Patrocinios />} />
-        <Route path="loja" element={<Loja />} />
+          <Route path="financeiro" element={<Financeiro />} />
+          <Route path="financeiro/receitas" element={<Lancamentos natureza="RECEITA" />} />
+          <Route path="financeiro/despesas" element={<Lancamentos natureza="DESPESA" />} />
+          <Route path="financeiro/orcamento" element={<Orcamento />} />
+          <Route path="financeiro/prestacao-de-contas" element={<PrestacaoDeContas />} />
 
-        {/* Comunicação */}
-        <Route path="comunicacao" element={<Noticias />} />
-        <Route path="comunicacao/campanhas" element={<Campanhas />} />
-        <Route path="comunicacao/campanhas/:id" element={<DetalheDaCampanha />} />
-        <Route path="comunicacao/midia" element={<BibliotecaDeMidia />} />
-        <Route path="avisos" element={<Avisos />} />
-        <Route path="relatorios" element={<Relatorios />} />
+          <Route path="rede" element={<ExplorarAtleticas />} />
+          <Route path="rede/feed" element={<Feed />} />
+          <Route path="rede/comunidades" element={<Comunidades />} />
+          <Route path="rede/comunidades/:id" element={<DetalheDaComunidade />} />
+          <Route path="rede/parcerias" element={<Parcerias />} />
+          <Route path="rede/ajuda" element={<PedidosDeAjuda />} />
+          <Route path="rede/ajuda/:id" element={<DetalheDoPedido />} />
+          <Route path="rede/amistosos" element={<Amistosos />} />
+
+          <Route path="conhecimento" element={<Guias />} />
+          <Route path="conhecimento/guias/:id" element={<DetalheDoGuia />} />
+          <Route path="conhecimento/modelos" element={<Modelos />} />
+          <Route path="conhecimento/experiencias" element={<Experiencias />} />
+          <Route path="conhecimento/experiencias/:id" element={<DetalheDaExperiencia />} />
+          <Route path="conhecimento/mentoria" element={<Mentoria />} />
+          <Route path="conhecimento/talentos" element={<Talentos />} />
+
+          <Route path="mercado/fornecedores" element={<Fornecedores />} />
+          <Route path="mercado/fornecedores/:id" element={<DetalheDoFornecedor />} />
+          <Route path="mercado/oportunidades" element={<Oportunidades />} />
+          <Route path="mercado/compras" element={<ComprasColetivas />} />
+          {/* O feed aponta para uma compra específica; a lista já mostra todas
+              e destaca a que interessa, então não há detalhe separado. */}
+          <Route path="mercado/compras/:id" element={<ComprasColetivas />} />
+          <Route path="mercado/patrocinios" element={<Patrocinios />} />
+          <Route path="loja" element={<Loja />} />
+
+          <Route path="comunicacao" element={<Noticias />} />
+          <Route path="comunicacao/campanhas" element={<Campanhas />} />
+          <Route path="comunicacao/campanhas/:id" element={<DetalheDaCampanha />} />
+          <Route path="comunicacao/midia" element={<BibliotecaDeMidia />} />
+          <Route path="avisos" element={<Avisos />} />
+          <Route path="relatorios" element={<Relatorios />} />
+        </Route>
 
         <Route path="*" element={<SecaoNaoEncontrada />} />
       </Route>
     </Routes>
+  )
+}
+
+/** Deixa passar na demonstração; no app real explica a ausência. */
+function PortaoDaDemonstracao() {
+  return MODO_DEMO ? <Outlet /> : <AindaSemServidor />
+}
+
+function AindaSemServidor() {
+  return (
+    <div className="vazio">
+      <h2>Esta parte ainda não existe no servidor</h2>
+      <p>
+        A tela está pronta e o banco já tem a tabela, mas o endpoint ainda não
+        foi escrito. Ela volta à navegação quando passar a salvar de verdade —
+        mostrar dado de exemplo aqui só faria você decidir em cima de número
+        inventado.
+      </p>
+      <Link to="." className="botao botao--discreto">Voltar ao início</Link>
+    </div>
   )
 }
 

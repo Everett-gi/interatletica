@@ -12,6 +12,7 @@ import { Boasvindas } from './paginas/Boasvindas'
 import { AtleticaPublica } from './paginas/AtleticaPublica'
 import { PaginaPublicaDoEvento } from './paginas/PaginaPublicaDoEvento'
 import { Convite } from './paginas/Convite'
+import { retomarConvite } from './paginas/conviteRetomado'
 import { MeuPerfil } from './paginas/MeuPerfil'
 import { Entrar } from './paginas/entrada/Entrar'
 import { CriarConta } from './paginas/entrada/CriarConta'
@@ -132,6 +133,18 @@ function PortaDeEntrada() {
   if (carregando) {
     return <Carregando />
   }
+
+  // O OAuth do Spring termina sempre em `/`, e não conhece rota de cliente.
+  // Quem clicou "entrar para aceitar" num convite volta logado para cá; sem
+  // esta retomada, o convite sumiu e a pessoa teria que achar o link no
+  // WhatsApp de novo — que é onde ela desiste.
+  if (perfil) {
+    const convite = retomarConvite()
+    if (convite) {
+      return <Navigate to={`/convite/${convite}`} replace />
+    }
+  }
+
   if (perfil && perfil.atleticas.length > 0) {
     return <Navigate to={`/hub/${perfil.atleticas[0].atletica.slug}`} replace />
   }

@@ -7,6 +7,7 @@ import br.com.interatletica.atletica.AtleticaDtos.IdentidadeVisual;
 import br.com.interatletica.atletica.AtleticaDtos.MinhaAtletica;
 import br.com.interatletica.atletica.AtleticaDtos.MudancaDeSituacao;
 import br.com.interatletica.atletica.AtleticaDtos.NovaAtletica;
+import br.com.interatletica.atletica.AtleticaDtos.NovaAtleticaPropria;
 import br.com.interatletica.comum.Slugs;
 import br.com.interatletica.comum.auditoria.Acoes;
 import br.com.interatletica.comum.auditoria.Auditoria;
@@ -16,7 +17,9 @@ import br.com.interatletica.comum.seguranca.SessaoAtual;
 import br.com.interatletica.comum.tenant.ContextoAtletica;
 import br.com.interatletica.identidade.ConviteDtos.ConviteResposta;
 import br.com.interatletica.identidade.ConviteDtos.NovoConvite;
+import br.com.interatletica.identidade.RepositorioDeUsuario;
 import br.com.interatletica.identidade.ServicoDeConvite;
+import br.com.interatletica.identidade.Usuario;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,17 +33,30 @@ public class ServicoDeAtletica {
     /** Mesmo limite de {@code atletica.slug VARCHAR(60)}. */
     private static final int TAMANHO_DO_SLUG = 60;
 
+    /**
+     * Teto de atléticas presididas pela mesma conta.
+     *
+     * <p>Existe porque a criação está aberta a qualquer pessoa autenticada
+     * durante os testes. Não é proteção contra ataque — é freio contra o
+     * clique repetido e contra quem resolva povoar a plataforma de atlética
+     * inventada antes de haver moderação.</p>
+     */
+    private static final int TETO_DE_PRESIDENCIAS = 3;
+
     private final RepositorioDeAtletica repositorio;
     private final RepositorioDeMembro repositorioDeMembro;
+    private final RepositorioDeUsuario repositorioDeUsuario;
     private final ServicoDeConvite servicoDeConvite;
     private final Auditoria auditoria;
 
     public ServicoDeAtletica(RepositorioDeAtletica repositorio,
                              RepositorioDeMembro repositorioDeMembro,
+                             RepositorioDeUsuario repositorioDeUsuario,
                              ServicoDeConvite servicoDeConvite,
                              Auditoria auditoria) {
         this.repositorio = repositorio;
         this.repositorioDeMembro = repositorioDeMembro;
+        this.repositorioDeUsuario = repositorioDeUsuario;
         this.servicoDeConvite = servicoDeConvite;
         this.auditoria = auditoria;
     }
@@ -80,6 +96,58 @@ public class ServicoDeAtletica {
                 Map.of("slug", slug, "presidenteConvidado", dados.emailDoPresidente()));
 
         return new AtleticaCriada(AtleticaResposta.de(atletica), convite);
+    }
+
+    /**
+     * Cria a atlética de quem está pedindo, que já entra como presidente.
+     *
+     * <p>Difere de {@link #criar(NovaAtletica)} no essencial: lá o operador
+     * abre a atlética para outra pessoa e o que sai é um convite; aqui quem
+     * cria é quem vai presidir, então atlética e vínculo nascem na mesma
+     * transação e não há convite — não haveria a quem enviar.</p>
+     *
+     * <p>Atlética sem presidente é registro morto, e é justamente o que
+     * sobraria se o vínculo falhasse depois do save da atlética. Por isso os
+     * dois passos são um só.</p>
+     */
+    @Transactional
+    public AtleticaResposta criarMinha(NovaAtleticaPropria dados) {
+        UUID usuarioId = SessaoAtual.exigirUsuarioId();
+        Usuario usuario = repositorioDeUsuario.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário", usuarioId));
+
+        long presidencias = repositorioDeMembro.vinculosAtivosDoUsuario(usuarioId).stream()
+                .filter(membro -> membro.getPapel() == Papel.PRESIDENTE)
+                .count();
+        if (presidencias >= TETO_DE_PRESIDENCIAS) {
+            throw new RegraDeNegocioException("LIMITE_DE_ATLETICAS",
+                    "Você já preside %d atléticas. Peça a um operador da plataforma para abrir outra."
+                            .formatted(presidencias));
+        }
+
+        String slug = dados.slug() != null && !dados.slug().isBlank()
+                ? dados.slug()
+                : Slugs.unico(dados.nome(), TAMANHO_DO_SLUG, repositorio::slugEmUso);
+
+        if (repositorio.slugEmUso(slug)) {
+            throw new RegraDeNegocioException("SLUG_EM_USO",
+                    "O endereço /%s já pertence a outra atlética.".formatted(slug));
+        }
+
+        Atletica atletica = new Atletica(slug, dados.nome().trim(), dados.instituicao().trim());
+        atletica.atualizarPerfil(dados.nome().trim(), dados.sigla(), dados.instituicao().trim(),
+                dados.cidade(), dados.uf(), null);
+        if (dados.corPrimaria() != null && !dados.corPrimaria().isBlank()) {
+            atletica.atualizarIdentidadeVisual(null, dados.corPrimaria(), null);
+        }
+        repositorio.save(atletica);
+
+        repositorioDeMembro.save(new Membro(atletica.getId(), usuario, Papel.PRESIDENTE));
+
+        auditoria.registrar(Acoes.ATLETICA_CRIADA, Acoes.E_ATLETICA, atletica.getId(),
+                Map.of("slug", slug, "criadaPeloProprioPresidente", "true"));
+
+        return AtleticaResposta.de(atletica);
     }
 
     @Transactional(readOnly = true)

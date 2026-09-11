@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { Dados } from '../../dados'
+import { Dados, MODO_DEMO } from '../../dados'
 import type { PassoDeOnboarding } from '../../api/tipos-plataforma'
 import { Conteudo, Esqueleto, useBusca } from '../../ui/componentes'
 import { CabecalhoDePagina, Progresso, Secao } from '../../ui/pagina'
@@ -106,6 +106,10 @@ export function Onboarding() {
                 </div>
               </Secao>
 
+              {/* Guia e rede são módulos sem servidor: no app real os dois
+                  atalhos levariam a uma tela que explica a ausência, que é o
+                  oposto de "enquanto isso, faça isto". */}
+              {MODO_DEMO ? (
               <Secao titulo="Enquanto isso">
                 <div className="grade">
                   <Link to={`/hub/${slug}/conhecimento`} className="cartao cartao--clicavel">
@@ -139,6 +143,7 @@ export function Onboarding() {
                   </Link>
                 </div>
               </Secao>
+              ) : null}
             </>
           )
         }}

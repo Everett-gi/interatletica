@@ -10,6 +10,7 @@ import type {
   EventoResumo,
   Inscricao,
   Membro,
+  NovaAtleticaPropria,
   OrigemDosInscritos,
   Papel,
   Participante,
@@ -43,6 +44,13 @@ export const Api = {
   },
 
   atletica: {
+    /**
+     * Cria a atlética de quem está pedindo, que já entra como presidente.
+     * A outra criação — `POST /api/atleticas` — é do operador e devolve
+     * convite; esta não tem a quem convidar.
+     */
+    criarMinha: (dados: NovaAtleticaPropria) =>
+      api.post<Atletica>('/api/atleticas/minha', dados),
     perfil: (slug: string) => api.get<Atletica>(a(slug)),
     atualizar: (slug: string, dados: unknown) => api.put<Atletica>(a(slug), dados),
     identidadeVisual: (slug: string, dados: unknown) =>

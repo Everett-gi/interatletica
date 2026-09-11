@@ -64,6 +64,17 @@ export interface PerfilDaSessao {
   convitesPendentes: number
 }
 
+/** Corpo de `POST /api/atleticas/minha`. Sem e-mail: o presidente é quem cria. */
+export interface NovaAtleticaPropria {
+  nome: string
+  sigla: string | null
+  instituicao: string
+  cidade: string | null
+  uf: string | null
+  slug?: string | null
+  corPrimaria: string | null
+}
+
 export interface Membro {
   id: string
   usuarioId: string
