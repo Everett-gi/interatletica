@@ -62,8 +62,11 @@ interatletica/
 ├── vercel.json                 deploy do front em modo demonstração
 └── infra/
     ├── Caddyfile               TLS automático + headers de segurança
+    ├── compose.producao.yml    imagens do GHCR, memória para 1 GB
     └── scripts/
-        ├── deploy.sh           backup → pull → build → health check
+        ├── preparar-servidor.sh  VM do zero: swap, firewall, Docker, timers
+        ├── atualizar.sh        main andou e a imagem existe? implanta
+        ├── deploy.sh           backup → imagens → subida → saúde, ou volta
         └── backup.sh           pg_dump → gzip → R2
 ```
 
@@ -283,13 +286,44 @@ docker compose up -d --build
 
 A API sobe em `:8080` atrás do Caddy. O Flyway aplica a migration na primeira subida.
 
-**Deploy na EC2:**
+### Produção
+
+Uma VM E2.1.Micro da Oracle (free tier: 1 GB de RAM, 1/8 de OCPU) em `129.148.43.144`, com o compose inteiro — Caddy, PWA, API e Postgres. Enquanto não há domínio próprio, o endereço é `https://129-148-43-144.sslip.io`: o sslip.io resolve o nome para o IP embutido nele, e isso basta para o Caddy tirar certificado.
+
+O caminho de um commit até o ar:
+
+1. Push em `main` roda o **CI**.
+2. Se o CI passa, o workflow **Imagens** constrói a API, a PWA e a PWA de demonstração e publica as três no GHCR, marcadas com o SHA do commit.
+3. No servidor, um timer do systemd (`atualizar.sh`) confere a cada 2 minutos se `main` andou e se as imagens daquele commit já existem. Se sim, `deploy.sh` faz backup, puxa, sobe e espera a API ficar saudável — e volta para a revisão anterior se ela não ficar.
+4. O último job do workflow pergunta ao `/versao.json` público se a revisão chegou, e fica vermelho se ela não chegou em 15 minutos.
+
+**O servidor puxa; ninguém empurra.** Nenhuma chave de acesso à VM mora no GitHub, e a VM não aceita conexão de fora além do SSH de quem administra. O preço é até 2 minutos de atraso entre a imagem pronta e o deploy.
+
+**Nada compila na VM.** Com 1/8 de OCPU, Maven e Vite levariam dezenas de minutos a cada deploy, disputando memória com o banco. `infra/compose.producao.yml` troca o `build` por imagem pronta e dimensiona JVM e Postgres para 1 GB.
+
+**Demonstração ou app de verdade é uma linha no `.env` do servidor:** `WEB_IMAGEM` aponta para `interatletica-web-demo` ou para `interatletica-web`. A API e o banco rodam nos dois casos. Na demonstração eles não recebem chamada, mas cada deploy continua provando que a API sobe contra o Postgres de verdade — e a troca, quando vier, não é a primeira subida dela.
+
+Máquina nova, do zero:
 
 ```bash
-./infra/scripts/deploy.sh main
+curl -fsSL https://raw.githubusercontent.com/Everett-gi/interatletica/main/infra/scripts/preparar-servidor.sh | sudo bash
 ```
 
-O script faz backup antes de tocar em qualquer coisa e aborta se o backup falhar. Depois valida o health check e só então declara sucesso.
+O script é idempotente e cuida de swap, firewall do host, Docker, clone do repositório e dos timers de atualização e de backup (3h30). Depois dele falta só o `/opt/interatletica/.env`, escrito à mão a partir da seção *só no servidor* do `.env.example`. A Security List da VCN, no console da Oracle, também precisa liberar 80 e 443 — é outra camada, fora do alcance da máquina.
+
+Onde olhar, dentro de `/opt/interatletica`:
+
+```bash
+journalctl -u interatletica-atualizar -n 50
+```
+
+```bash
+docker compose ps
+```
+
+```bash
+docker compose logs -f api
+```
 
 **Google OAuth** — no console, a URI de redirecionamento autorizada é:
 

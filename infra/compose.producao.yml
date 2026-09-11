@@ -1,0 +1,63 @@
+# =====================================================================
+# Sobreposição para o servidor. Ligada pelo .env de lá:
+#
+#   COMPOSE_FILE=docker-compose.yml:infra/compose.producao.yml
+#
+# Com isso, qualquer `docker compose ...` rodado na pasta já considera os
+# dois arquivos — não há comando especial para lembrar.
+#
+# Duas diferenças em relação ao compose base:
+#
+# 1. As imagens chegam prontas do GHCR, construídas pelo GitHub Actions.
+#    A VM é uma E2.1.Micro da Oracle (1/8 de OCPU, 1 GB de RAM): compilar
+#    Maven e Vite ali levaria dezenas de minutos disputando memória com o
+#    banco, a cada deploy.
+#
+# 2. Memória dimensionada para 1 GB. Sem limite explícito a JVM calcula o
+#    heap sobre a RAM da máquina inteira, e o Postgres reserva buffers que
+#    aqui não existem. Os dois brigando é como o OOM killer escolhe quem
+#    derrubar — e costuma escolher o banco.
+# =====================================================================
+
+services:
+
+  db:
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      # O pool do Hikari tem 10 conexões; 100, o padrão, é memória
+      # reservada para cliente que nunca vem.
+      - -c
+      - max_connections=30
+
+  api:
+    image: ${API_IMAGEM:?defina API_IMAGEM no .env}:${IMAGEM_TAG:?IMAGEM_TAG vazio - quem define e o deploy.sh}
+    build: !reset null
+    environment:
+      # Heap fixo em vez de percentual da máquina. C1 apenas
+      # (TieredStopAtLevel=1): numa CPU de 1/8, o C2 compilando atrasa a
+      # subida em minutos, e o ganho de pico dele não aparece com o
+      # tráfego de uma rede de atléticas.
+      JAVA_TOOL_OPTIONS: >-
+        -Xms64m -Xmx256m
+        -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=48m
+        -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k
+        -XX:+ExitOnOutOfMemoryError
+        -Duser.timezone=America/Sao_Paulo
+    healthcheck:
+      # A primeira subida roda o Flyway inteiro. Durante o start_period
+      # uma falha não conta, e o container vira healthy no primeiro
+      # sucesso — então folga aqui não atrasa nada, só evita reinício à
+      # toa.
+      start_period: 300s
+
+  web:
+    image: ${WEB_IMAGEM:?defina WEB_IMAGEM no .env}:${IMAGEM_TAG:?IMAGEM_TAG vazio - quem define e o deploy.sh}
+    build: !reset null

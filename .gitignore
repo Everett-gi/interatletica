@@ -27,6 +27,7 @@ Thumbs.db
 # Runtime
 *.log
 backups/
+.revisao-recusada
 
 # Build do front
 web/dist/

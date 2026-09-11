@@ -6,8 +6,10 @@
 # configuração. Separar em api.dominio depois é uma linha de mudança.
 # =====================================================================
 
+# Sem `email` de ACME: o Let's Encrypt encerrou os avisos de expiração por
+# e-mail em 2025, e o Caddy renova sozinho semanas antes do vencimento.
+# Exigir o campo só servia para travar a primeira subida.
 {
-	email {$EMAIL_ACME}
 	servers {
 		# Necessário para que o Spring monte as URLs de redirect do OAuth
 		# com https e o host público, e não com http://api:8080.

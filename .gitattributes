@@ -1,0 +1,13 @@
+# Arquivos que rodam ou sao lidos no Linux do servidor e do CI ficam em
+# LF mesmo quando editados num Windows que grave CRLF. Um script com
+# `#!/usr/bin/env bash\r` nao executa — o kernel procura um interpretador
+# chamado "bash\r" —, e o erro so apareceria no servidor, na hora de um
+# deploy ou de um backup.
+*.sh            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+Dockerfile      text eol=lf
+Caddyfile       text eol=lf
+*.conf          text eol=lf
+.env.example    text eol=lf
+.gitattributes  text eol=lf

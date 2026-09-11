@@ -73,6 +73,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
+        VITE_MODO_DEMO: ${VITE_MODO_DEMO:-false}
     container_name: interatletica-web
     restart: unless-stopped
     networks: [borda]
@@ -90,7 +91,6 @@ services:
       - "443:443/udp"          # HTTP/3
     environment:
       DOMINIO: ${DOMINIO:-interatletica.com.br}
-      EMAIL_ACME: ${EMAIL_ACME:?defina EMAIL_ACME no .env}
     volumes:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_dados:/data

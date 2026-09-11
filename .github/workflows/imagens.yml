@@ -1,0 +1,131 @@
+# =====================================================================
+# Publica as imagens de produção no GHCR.
+#
+# Roda depois do CI, e só se ele passou: o servidor implanta o que
+# aparece aqui, então imagem publicada é, por construção, commit testado.
+#
+# Três imagens por commit, marcadas com o SHA completo:
+#   interatletica-api        Spring Boot
+#   interatletica-web        PWA falando com a API
+#   interatletica-web-demo   PWA em modo demonstração, sem API
+#
+# O servidor escolhe entre web e web-demo pelo .env dele, e se atualiza
+# sozinho (infra/scripts/atualizar.sh). Este workflow não tem acesso à
+# máquina — o último job só pergunta, pela URL pública, se a revisão
+# chegou ao ar.
+# =====================================================================
+
+name: Imagens
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Publicações em fila, nunca canceladas no meio: imagem pela metade no
+# registro é pior que imagem atrasada.
+concurrency:
+  group: imagens
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REVISAO: ${{ github.event.workflow_run.head_sha || github.sha }}
+  URL_PRODUCAO: ${{ vars.URL_PRODUCAO || 'https://129-148-43-144.sslip.io' }}
+
+jobs:
+
+  publicar:
+    name: ${{ matrix.nome }}
+    # workflow_run dispara também quando o CI falha; aqui só segue o que
+    # passou, e só push em main — PR não vai para produção.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - nome: interatletica-api
+            contexto: api
+            demo: 'false'
+          - nome: interatletica-web
+            contexto: web
+            demo: 'false'
+          - nome: interatletica-web-demo
+            contexto: web
+            demo: 'true'
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.REVISAO }}
+
+      - name: Nome no registro
+        id: nome
+        # GHCR só aceita minúsculas, e o dono do repositório tem maiúscula.
+        run: echo "imagem=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.nome }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.contexto }}
+          platforms: linux/amd64
+          push: true
+          # A API ignora os dois; o BuildKit só avisa.
+          build-args: |
+            VITE_MODO_DEMO=${{ matrix.demo }}
+            REVISAO=${{ env.REVISAO }}
+          tags: |
+            ${{ steps.nome.outputs.imagem }}:${{ env.REVISAO }}
+            ${{ steps.nome.outputs.imagem }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.REVISAO }}
+          cache-from: type=gha,scope=${{ matrix.nome }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.nome }}
+          provenance: false
+
+  no-ar:
+    name: Revisão no ar
+    needs: publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Esperar o servidor puxar a revisão
+        run: |
+          # O servidor olha o GHCR a cada 2 minutos e leva alguns para
+          # subir a API numa CPU de 1/8. Nada aqui implanta — só deixa
+          # visível no GitHub se a revisão chegou.
+          for i in $(seq 1 60); do
+            no_ar=$(curl -fsS --max-time 10 "$URL_PRODUCAO/versao.json" 2>/dev/null \
+              | sed -n 's/.*"revisao":"\([0-9a-f]*\)".*/\1/p' || true)
+            if [ "$no_ar" = "$REVISAO" ]; then
+              echo "No ar: $REVISAO"
+              exit 0
+            fi
+            # Commit mais novo em main: o servidor pula direto para ele,
+            # e esperar este aqui seria esperar para sempre.
+            topo=$(git ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/main | cut -f1)
+            if [ -n "$topo" ] && [ "$topo" != "$REVISAO" ]; then
+              echo "::notice::Superada por ${topo:0:7} antes de chegar ao ar."
+              exit 0
+            fi
+            echo "No ar: ${no_ar:-?} · esperando ${REVISAO:0:7}"
+            sleep 15
+          done
+          echo "::error::A revisão não chegou ao ar em 15 minutos. No servidor: journalctl -u interatletica-atualizar"
+          exit 1
