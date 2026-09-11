@@ -63,6 +63,11 @@ main() {
     cd "$RAIZ"
     [[ -f .env ]] || { erro ".env não encontrado — modelo em .env.example"; exit 1; }
 
+    # No compose, variável de ambiente ganha do .env. Herdada de quem
+    # chamou — vazia, ou com a revisão anterior —, ela anularia o valor
+    # que definir_tag acabou de gravar. Já aconteceu, na primeira subida.
+    unset IMAGEM_TAG
+
     local anterior
     anterior="$(sed -n 's/^IMAGEM_TAG=//p' .env)"
 

@@ -20,19 +20,23 @@ cd "$RAIZ"
 # Sem .env o servidor ainda não foi configurado; reclamar a cada 2
 # minutos no journal não ajudaria ninguém a configurá-lo.
 [[ -f .env ]] || exit 0
-set -a; source .env; set +a
+
+# Lê do .env só o que precisa, sem `source`. Exportar o .env inteiro
+# vazaria IMAGEM_TAG para o deploy.sh — e, no compose, variável de
+# ambiente ganha do .env: o valor velho venceria o recém-gravado.
+valor() { sed -n "s/^$1=//p" .env | tail -n 1; }
 
 git fetch --quiet origin main
 alvo="$(git rev-parse origin/main)"
 
-[[ "$alvo" == "${IMAGEM_TAG:-}" ]] && exit 0
+[[ "$alvo" == "$(valor IMAGEM_TAG)" ]] && exit 0
 
 # Revisão que já falhou não é tentada de novo a cada 2 minutos — cada
 # tentativa faz backup e derruba a API por alguns minutos. O próximo
 # commit destrava.
 [[ -f .revisao-recusada && "$(cat .revisao-recusada)" == "$alvo" ]] && exit 0
 
-for imagem in "$API_IMAGEM" "$WEB_IMAGEM"; do
+for imagem in "$(valor API_IMAGEM)" "$(valor WEB_IMAGEM)"; do
     docker manifest inspect "$imagem:$alvo" >/dev/null 2>&1 || exit 0
 done
 
