@@ -91,8 +91,12 @@ services:
       - "443:443/udp"          # HTTP/3
     environment:
       DOMINIO: ${DOMINIO:-interatletica.com.br}
+      DOMINIOS_REDIRECIONADOS: ${DOMINIOS_REDIRECIONADOS:-}
     volumes:
-      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      # A pasta, e não o arquivo. Montado sozinho, o Caddyfile que o git
+      # troca por outro (inode novo) continua invisível para o container,
+      # e o `caddy reload` do deploy releria a versão velha.
+      - ./infra/caddy:/etc/caddy:ro
       - caddy_dados:/data
       - caddy_config:/config
     networks: [borda]

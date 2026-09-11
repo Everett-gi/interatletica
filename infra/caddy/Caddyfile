@@ -17,7 +17,7 @@
 	}
 }
 
-{$DOMINIO}, www.{$DOMINIO} {
+{$DOMINIO} {
 
 	encode zstd gzip
 
@@ -87,4 +87,21 @@
 		}
 		format json
 	}
+}
+
+# ---------------------------------------------------------------------
+# Endereços que só redirecionam para o principal: o www e os nomes antigos
+# (DOMINIOS_REDIRECIONADOS no .env, separados por espaço) enquanto houver
+# link circulando com eles. Endereço único não é capricho: o redirect_uri
+# registrado no Google tem um host só, e o cookie de sessão também.
+# ---------------------------------------------------------------------
+www.{$DOMINIO} {$DOMINIOS_REDIRECIONADOS} {
+	redir https://{$DOMINIO}{uri} permanent
+}
+
+# Quem digita o IP chega pela porta 80 e é mandado para o nome. Pela 443
+# o IP não tem como responder — certificado se emite para nome —, e o
+# navegador que vai direto a https://IP vê a conexão encerrada.
+http:// {
+	redir https://{$DOMINIO}{uri} permanent
 }

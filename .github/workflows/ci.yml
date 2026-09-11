@@ -92,6 +92,22 @@ jobs:
           path: api/target/surefire-reports/
           retention-days: 7
 
+  caddy:
+    name: Caddy · configuração
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validar o Caddyfile
+        # O deploy recarrega o Caddyfile sozinho. Erro de sintaxe pego
+        # aqui é imagem que não chega a ser publicada; pego no servidor,
+        # é rollback.
+        run: |
+          docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" \
+            -e DOMINIO=exemplo.com.br -e DOMINIOS_REDIRECIONADOS=antigo.exemplo.com.br \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   web:
     name: PWA · TypeScript
     runs-on: ubuntu-latest

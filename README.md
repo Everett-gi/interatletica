@@ -61,7 +61,7 @@ interatletica/
 │       └── paginas/            públicas na raiz, hub/ para a diretoria
 ├── vercel.json                 deploy do front em modo demonstração
 └── infra/
-    ├── Caddyfile               TLS automático + headers de segurança
+    ├── caddy/Caddyfile         TLS automático, headers, redirecionamentos
     ├── compose.producao.yml    imagens do GHCR, memória para 1 GB
     └── scripts/
         ├── preparar-servidor.sh  VM do zero: swap, firewall, Docker, timers
@@ -288,13 +288,13 @@ A API sobe em `:8080` atrás do Caddy. O Flyway aplica a migration na primeira s
 
 ### Produção
 
-Uma VM E2.1.Micro da Oracle (free tier: 1 GB de RAM, 1/8 de OCPU) em `129.148.43.144`, com o compose inteiro — Caddy, PWA, API e Postgres. Enquanto não há domínio próprio, o endereço é `https://129-148-43-144.sslip.io`: o sslip.io resolve o nome para o IP embutido nele, e isso basta para o Caddy tirar certificado.
+Uma VM E2.1.Micro da Oracle (free tier: 1 GB de RAM, 1/8 de OCPU) em `129.148.43.144`, com o compose inteiro — Caddy, PWA, API e Postgres. Enquanto não há domínio próprio, o endereço é `https://interatletica.duckdns.org` (DuckDNS, gratuito). O `129-148-43-144.sslip.io` do primeiro dia e o `http://` do IP redirecionam para ele. `https://` direto no IP não tem como responder: certificado se emite para nome, e o navegador vê a conexão encerrada.
 
 O caminho de um commit até o ar:
 
 1. Push em `main` roda o **CI**.
 2. Se o CI passa, o workflow **Imagens** constrói a API, a PWA e a PWA de demonstração e publica as três no GHCR, marcadas com o SHA do commit.
-3. No servidor, um timer do systemd (`atualizar.sh`) confere a cada 2 minutos se `main` andou e se as imagens daquele commit já existem. Se sim, `deploy.sh` faz backup, puxa, sobe e espera a API ficar saudável — e volta para a revisão anterior se ela não ficar.
+3. No servidor, um timer do systemd (`atualizar.sh`) confere a cada 2 minutos se `main` andou e se as imagens daquele commit já existem. Se sim, `deploy.sh` faz backup, puxa, sobe, espera a API ficar saudável e recarrega o Caddyfile — e volta para a revisão anterior se algo disso falhar.
 4. O último job do workflow pergunta ao `/versao.json` público se a revisão chegou, e fica vermelho se ela não chegou em 15 minutos.
 
 **O servidor puxa; ninguém empurra.** Nenhuma chave de acesso à VM mora no GitHub, e a VM não aceita conexão de fora além do SSH de quem administra. O preço é até 2 minutos de atraso entre a imagem pronta e o deploy.

@@ -36,7 +36,7 @@ permissions:
 
 env:
   REVISAO: ${{ github.event.workflow_run.head_sha || github.sha }}
-  URL_PRODUCAO: ${{ vars.URL_PRODUCAO || 'https://129-148-43-144.sslip.io' }}
+  URL_PRODUCAO: ${{ vars.URL_PRODUCAO || 'https://interatletica.duckdns.org' }}
 
 jobs:
 

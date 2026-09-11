@@ -69,6 +69,18 @@ imagens_da_revisao() {
     done
 }
 
+# Aplica o Caddyfile da revisão sem derrubar conexão. Arquivo inválido
+# conta como deploy falho: o Caddy segue com a configuração anterior, e o
+# rollback devolve o arquivo que funcionava.
+recarregar_caddy() {
+    local saida
+    if ! saida="$(docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1)"; then
+        erro "o Caddyfile da revisão não carregou"
+        printf '%s\n' "$saida" | tail -5 >&2
+        return 1
+    fi
+}
+
 main() {
     local revisao="${1:?uso: deploy.sh <sha completo do commit>}"
     [[ "$revisao" =~ ^[0-9a-f]{40}$ ]] || { erro "revisão inválida: $revisao"; exit 2; }
@@ -96,7 +108,7 @@ main() {
     git fetch --quiet --prune origin
     log "implantando ${revisao:0:7}"
 
-    if subir "$revisao" && api_saudavel && imagens_da_revisao "$revisao"; then
+    if subir "$revisao" && api_saudavel && imagens_da_revisao "$revisao" && recarregar_caddy; then
         # Uma semana de imagens fica guardada para voltar sem depender
         # do GHCR; o que é mais velho e não está em uso sai.
         docker image prune -af --filter "until=168h" >/dev/null
@@ -109,7 +121,7 @@ main() {
 
     if [[ "$anterior" =~ ^[0-9a-f]{40}$ && "$anterior" != "$revisao" ]]; then
         log "voltando para ${anterior:0:7}"
-        if subir "$anterior" && api_saudavel && imagens_da_revisao "$anterior"; then
+        if subir "$anterior" && api_saudavel && imagens_da_revisao "$anterior" && recarregar_caddy; then
             log "revisão anterior restaurada"
         else
             erro "a revisão anterior também não subiu — intervenção manual"
